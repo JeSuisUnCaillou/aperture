@@ -323,6 +323,13 @@
       "when": 1780022400000,
       "tag": "0046_metric_snapshot",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1780023600000,
+      "tag": "0047_signature_class_kind",
+      "breakpoints": true
     }
   ]
 }
