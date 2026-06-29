@@ -2,7 +2,7 @@
 
 import { Menu as MenuPrimitive } from '@base-ui/react/menu';
 import { ContextMenu } from '@base-ui/react/context-menu';
-import { Plus, Radar, Scissors, StickyNote, Trash2, Unlink } from 'lucide-react';
+import { Plus, Radar, Scissors, StickyNote, Trash2, Unlink, X } from 'lucide-react';
 
 import type {
   MapContextMenuTarget,
@@ -131,6 +131,7 @@ export function MapContextMenu({
   onAddNoteAt,
   onNotePatch,
   onNoteRemove,
+  onClearSelection,
 }: {
   target: MapContextMenuTarget | null;
   onClose: () => void;
@@ -162,6 +163,8 @@ export function MapContextMenu({
   onAddNoteAt: (clientX: number, clientY: number) => void;
   onNotePatch: (id: string, patch: UpdateNoteBody) => void;
   onNoteRemove: (id: string) => void;
+  /** Pane action: clear the current system selection. */
+  onClearSelection: () => void;
 }) {
   // A zero-size virtual element at the cursor point; recreated per render so the
   // rect tracks the current target's coordinates.
@@ -230,6 +233,7 @@ export function MapContextMenu({
               onAddNoteAt,
               onNotePatch,
               onNoteRemove,
+              onClearSelection,
             })}
           </MenuPrimitive.Popup>
         </MenuPrimitive.Positioner>
@@ -259,6 +263,7 @@ function renderItems({
   onAddNoteAt,
   onNotePatch,
   onNoteRemove,
+  onClearSelection,
 }: {
   target: MapContextMenuTarget | null;
   onClose: () => void;
@@ -280,6 +285,7 @@ function renderItems({
   onAddNoteAt: (clientX: number, clientY: number) => void;
   onNotePatch: (id: string, patch: UpdateNoteBody) => void;
   onNoteRemove: (id: string) => void;
+  onClearSelection: () => void;
 }) {
   if (!target) return null;
 
@@ -410,6 +416,17 @@ function renderItems({
                 Delete disconnected
               </MenuItem>
             ))}
+          {selectedSystemIds.size > 0 && (
+            <MenuItem
+              icon={<X className="size-3.5" />}
+              onClick={() => {
+                onClearSelection();
+                onClose();
+              }}
+            >
+              Unselect current system
+            </MenuItem>
+          )}
         </>
       );
     }

@@ -1701,6 +1701,10 @@ export function MapCanvas({
               onAddNoteAt={onAddNoteAt}
               onNotePatch={onNotePatch}
               onNoteRemove={onNoteRemove}
+              onClearSelection={() => {
+                setSelected(null);
+                setSelectedSystemIds(new Set());
+              }}
             />
           </div>
         );
