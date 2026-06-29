@@ -1,5 +1,41 @@
 # Changelog
 
+## v1.0.0-rc.10
+
+This release adds a full observability suite — metrics, an admin metrics page, instance alerting and client-error capture — and lets signature entries record whether they are a signature or an anomaly. It also refreshes the app's branding with the Aperture logo.
+
+### New features
+
+- **Observability suite** — Aperture now exposes Prometheus-style metrics across ESI, route planning, its own HTTP surface, background jobs and realtime fanout, sampled into `ap_metric_snapshot` for the new admin metrics page's history graphs. An in-process instance-alerting loop (booted from `server.ts` so it survives DB degradation) evaluates rules for breaker state, abandoned jobs and error rates, and a new `/api/client-errors` endpoint captures browser-side errors into `ap_error_log` under per-session and global rate limits. *(MonoliYoda)*
+- **Signatures vs anomalies** — a scanned entry now records and displays whether it is a signature or an anomaly, instead of treating everything as a signature. *(Ionis en Gravonere)*
+
+### Improvements
+
+- **Aperture logo** now appears in the favicon, the app header and the login page. *(Caillou)*
+- **Compact pilot table** — the system-presence popup uses a compact variant of the pilot table, keeping the full roster columns in a tighter footprint. *(Ionis en Gravonere)*
+- **Dormant connections re-confirm on jump** — a wormhole connection that had gone dormant is re-confirmed when a tracked pilot is observed jumping through it. *(MonoliYoda)*
+- **J377 wormhole** added to the wormhole-classes data. *(Ionis en Gravonere)*
+
+### Fixes
+
+- **Route planner no longer hydration-mismatches** on a persisted source system, fixing a client/server render mismatch when a saved source was restored. *(MonoliYoda)*
+
+### Tuning
+
+- **EOL wormhole safety buffer widened to 15%** (≈36 min on the 4h nominal lifetime), giving a more conservative collapse countdown on EOL-flagged connections. *(MonoliYoda)*
+
+### Misc
+
+- GitHub Actions workflow to announce releases on Discord. *(MonoliYoda)*
+- CI guard that fails any PR targeting `master` (work lands on `dev`). *(MonoliYoda)*
+- Runtime Docker image now bundles the `public` directory. *(MonoliYoda)*
+
+### Contributors
+
+- **MonoliYoda** — observability suite, dormant-connection re-confirm, route-planner hydration fix, EOL buffer tuning, release/CI/Docker tooling
+- **Ionis en Gravonere** — signature/anomaly distinction, compact pilot table, J377 wormhole data
+- **Caillou** — Aperture logo branding
+
 ## v1.0.0-rc.9
 
 This release adds collaborative map notes, replaces the system presence popup with a full pilot table, and lets you share dashboard layouts as a file.

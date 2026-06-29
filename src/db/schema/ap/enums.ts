@@ -120,6 +120,20 @@ export const signatureGroupKey = pgEnum('signature_group_key', [
 ]);
 
 /**
+ * Whether a scanner entry is a `signature` (must be scanned down) or an
+ * `anomaly` (instantly warpable, no scanning). EVE's probe-scanner "Class"
+ * column carries this as a localized "Cosmic Signature" / "Cosmic Anomaly"
+ * label; the paste parser resolves it via `signatureClassKind`
+ * (`src/lib/map/signatureClasses.ts`) and it lands in
+ * `ap_map_signature.class_kind`. Nullable: paste-derived only, so legacy rows
+ * and low-information manual rows have no known kind.
+ */
+export const signatureClassKind = pgEnum('signature_class_kind', [
+  'signature',
+  'anomaly'
+]);
+
+/**
  * Where an `ap_role` row originates.
  * - `builtin` — created by the app itself (e.g. seed roles, admin-panel hand-grants).
  * - `corp_title` — mirrored from an EVE corporation title pulled via
@@ -192,3 +206,18 @@ export const accessCapability = pgEnum('access_capability', [
   'view',
   'edit',
 ]);
+
+/**
+ * Severity of a persisted `ap_error_log` row, mirroring the pino levels the
+ * structured logger emits. Only `error`/`fatal` are written today (the persist
+ * threshold in `src/lib/log/logger.ts`); `warn` is declared so the threshold
+ * could be lowered later without an `ALTER TYPE`.
+ */
+export const errorLevel = pgEnum('error_level', ['warn', 'error', 'fatal']);
+
+/**
+ * Where an `ap_error_log` row originated. `server` = request/action path,
+ * `job` = background worker, `client` = browser (Phase 7 ingest route, declared
+ * now to avoid a later `ALTER TYPE`).
+ */
+export const errorSource = pgEnum('error_source', ['server', 'job', 'client']);
