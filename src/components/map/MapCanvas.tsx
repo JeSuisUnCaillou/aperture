@@ -970,10 +970,6 @@ export function MapCanvas({
     setSelectedSystemIds(new Set());
   }, []);
 
-  const onPaneClick = useCallback(() => {
-    setSelected(null);
-    setSelectedSystemIds(new Set());
-  }, []);
 
   // Right-click handlers. Each suppresses the native browser menu and stores the
   // cursor point + target; selection is intentionally left untouched.
@@ -1651,7 +1647,6 @@ export function MapCanvas({
               edgeTypes={edgeTypes}
               onNodeClick={onNodeClick}
               onEdgeClick={onEdgeClick}
-              onPaneClick={onPaneClick}
               onNodeContextMenu={onNodeContextMenu}
               onEdgeContextMenu={onEdgeContextMenu}
               onPaneContextMenu={onPaneContextMenu}
