@@ -44,7 +44,7 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 - `AUTHZ_ADMIN_ROLE` — the ESI corporation role (`Director`) that resolves a character to `manager`.
 
 **Wormhole / signature lifetimes**
-- `WORMHOLE_EOL_LIFETIME_MS` (4h + 15m buffer), `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (1h + 15m), `WORMHOLE_DEFAULT_LIFETIME_MS` (48h) — drive the canvas countdowns and the reap-job purge thresholds.
+- `WORMHOLE_EOL_LIFETIME_MS` (4h + 15% / 36m buffer), `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (1h + 15m), `WORMHOLE_DEFAULT_LIFETIME_MS` (48h) — drive the canvas countdowns and the reap-job purge thresholds.
 - `SIGNATURE_DEFAULT_TTL_MS` — default `expires_at` offset for new signatures (5 days).
 
 **Job runtime / instrumentation**

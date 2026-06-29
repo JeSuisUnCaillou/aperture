@@ -224,10 +224,10 @@ export const apertureConfig = {
 
   /**
    * How long a wormhole connection has left from the moment it goes EOL to the
-   * point a reap job would purge it: 4h nominal + 15m safety buffer. Read by the
+   * point a reap job would purge it: 4h nominal + 15% (36 minutes) safety buffer. Read by the
    * EOL-expiry job and surfaced as a countdown on EOL-flagged edges.
    */
-  WORMHOLE_EOL_LIFETIME_MS: 15_300_000,
+  WORMHOLE_EOL_LIFETIME_MS: 16_560_000,
 
   /**
    * How long a wormhole connection has left from the moment it enters the
