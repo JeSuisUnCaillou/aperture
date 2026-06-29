@@ -242,7 +242,7 @@ async function ensureConnection(
   }
 
   const existing = await db
-    .select({ id: apMapConnection.id })
+    .select({ id: apMapConnection.id, confirmedAt: apMapConnection.confirmedAt })
     .from(apMapConnection)
     .where(
       and(
@@ -260,7 +260,17 @@ async function ensureConnection(
       ),
     )
     .limit(1);
-  if (existing.length > 0) return { connectionId: existing[0]!.id, created: false };
+  if (existing.length > 0) {
+    const row = existing[0]!;
+    // A confirmed connection is already on the map — observe-only, no event.
+    if (row.confirmedAt !== null) return { connectionId: row.id, created: false };
+    // The row is dormant: an endpoint was removed (NULLing confirmed_at) and not
+    // restored via the sig path, so the link is hidden. The pilot physically
+    // traversing the hole is a fresh observation — re-confirm and re-broadcast as
+    // `connection.create` (the client upserts edges by id, so this is idempotent),
+    // mirroring restoreConnection. Without this the hole would stay invisible.
+    return reconfirmConnection(mapId, row.id, characterId);
+  }
 
   let newConnectionId: bigint | null = null;
   const result = await commitMapEvent({
@@ -321,6 +331,66 @@ async function ensureConnection(
     );
   }
   return { connectionId: newConnectionId, created: true };
+}
+
+/**
+ * Re-confirm a dormant `wh` connection traversed by a jump: flip `confirmed_at`
+ * back to now and re-broadcast the full edge body as `connection.create`. The
+ * row keeps its observed WH state (type/mass/EOL/static); we never delete and
+ * recreate it (that would cascade the attached signature). Mirrors
+ * `restoreConnection`'s re-confirm-and-rebroadcast contract.
+ */
+async function reconfirmConnection(
+  mapId: bigint,
+  connectionId: bigint,
+  characterId: bigint,
+): Promise<EnsureConnectionOutcome> {
+  const result = await commitMapEvent({
+    mapId,
+    characterId,
+    kind: 'connection.create',
+    mutate: async (tx) => {
+      const [row] = await tx
+        .update(apMapConnection)
+        .set({ confirmedAt: sql`now()`, updatedAt: sql`now()` })
+        .where(and(eq(apMapConnection.id, connectionId), eq(apMapConnection.mapId, mapId)))
+        .returning({
+          id: apMapConnection.id,
+          source: apMapConnection.sourceMapSystemId,
+          target: apMapConnection.targetMapSystemId,
+          scope: apMapConnection.scope,
+          massStatus: apMapConnection.massStatus,
+          jumpMassClass: apMapConnection.jumpMassClass,
+          eolStage: apMapConnection.eolStage,
+          preserveMass: apMapConnection.preserveMass,
+          isRolling: apMapConnection.isRolling,
+          isStatic: apMapConnection.isStatic,
+          eolAt: apMapConnection.eolAt,
+          createdAt: apMapConnection.createdAt,
+        });
+      if (!row) throw new Error(`Dormant connection ${connectionId} vanished before re-confirm.`);
+      return {
+        id: row.id.toString(),
+        source: row.source.toString(),
+        target: row.target.toString(),
+        scope: row.scope,
+        massStatus: row.massStatus,
+        jumpMassClass: row.jumpMassClass,
+        eolStage: row.eolStage,
+        preserveMass: row.preserveMass,
+        isRolling: row.isRolling,
+        isStatic: row.isStatic,
+        eolAt: row.eolAt ? row.eolAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+      };
+    },
+  });
+  if (!result.ok) {
+    throw new Error(`Failed to re-confirm dormant connection ${connectionId} on map ${mapId}: ${result.error}`);
+  }
+  // `created: true` so the caller writes a mass-log entry for the traversal — the
+  // hole is freshly back on the map, same as a brand-new fold.
+  return { connectionId, created: true };
 }
 
 /**
