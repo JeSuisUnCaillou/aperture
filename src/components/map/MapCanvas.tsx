@@ -92,7 +92,7 @@ import {
   SignatureModule,
   SignatureModuleHeaderActions,
 } from '@/components/sidebar/SignatureModule';
-import { Download, Info, LayoutDashboard, Plus, RotateCcw, ScrollText, Settings, Trash2, Upload, User } from 'lucide-react';
+import { Download, Info, LayoutDashboard, RotateCcw, ScrollText, Settings, Trash2, Upload, User } from 'lucide-react';
 import { Tooltip } from '@base-ui/react/tooltip';
 import { Button } from '@/components/ui/button';
 import {
@@ -1899,11 +1899,6 @@ export function MapCanvas({
                   if (file) void handleImportFile(file);
                 }}
               />
-              <Button variant="ghost" size="sm" onClick={() => setAddSystemOpen(true)}>
-                <Plus />
-                Add system
-              </Button>
-
               <Button variant="ghost" size="sm" onClick={() => setMapInfoOpen(true)}>
                 <Info />
                 Map info
