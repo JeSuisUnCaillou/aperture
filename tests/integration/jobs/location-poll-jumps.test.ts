@@ -351,24 +351,32 @@ describe.skipIf(!run)('Stage 12.2 location-poll jump classification + fan-out (r
     expect(notes!.jumpClass).toBe('wormhole');
   });
 
-  it('re-adding a previously-hidden system restores its old coordinates', async () => {
-    // Prime the map with a B→C jump, then nudge C to a hand-picked spot and hide it.
+  it('re-adding a previously-hidden system re-places it off the new parent, not at its stale coords', async () => {
+    // Prime the map with a B→C jump, then shove C to a far-off spot and hide it —
+    // simulating a now-defunct chain where C sat somewhere unrelated.
     await db.update(apCharacter).set({ lastSystemId: SYS_B }).where(eq(apCharacter.id, CHAR_ID));
     mockEsi({ online: true, systemId: SYS_C });
     await locationPoll.run({ characterId: CHAR_ID.toString() }, makeHelpers().helpers);
 
-    const moved = { x: 1234, y: -5678 };
+    const stale = { x: 1234, y: -5678 };
     await db
       .update(apMapSystem)
-      .set({ positionX: moved.x, positionY: moved.y, visible: false })
+      .set({ positionX: stale.x, positionY: stale.y, visible: false })
       .where(and(eq(apMapSystem.mapId, mapA), eq(apMapSystem.systemId, SYS_C)));
 
-    // Re-fire the same jump; C re-adds through the onConflictDoUpdate path.
+    // Re-fire the same jump; C re-adds through the onConflictDoUpdate path and must
+    // be re-placed adjacent to its parent (B), not restored to the stale coords.
     await db.update(apCharacter).set({ lastSystemId: SYS_B }).where(eq(apCharacter.id, CHAR_ID));
     await locationPoll.run({ characterId: CHAR_ID.toString() }, makeHelpers().helpers);
 
+    const posB = await systemPos(mapA, SYS_B);
     const posC = await systemPos(mapA, SYS_C);
-    expect(posC).toEqual(moved);
+    expect(posC).not.toEqual(stale);
+    expect(snapToGrid(posC)).toEqual(posC);
+    expect(overlaps(posB, posC)).toBe(false);
+    // Re-placed within the first placement ring of the parent on each axis.
+    expect(Math.abs(posC.x - posB.x)).toBeLessThanOrEqual(SLOT_X);
+    expect(Math.abs(posC.y - posB.y)).toBeLessThanOrEqual(SLOT_Y);
   });
 
   it('repeated wormhole jump is idempotent (no new events)', async () => {
