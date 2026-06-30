@@ -317,6 +317,7 @@ describe.skipIf(!run)('bulk signature paste — diff / atomic commit (real Postg
           name: 'Barren Reservoir',
           groupName: 'Gas Site',
           signal: '100.0%',
+          classKind: 'signature',
           groupKey: 'gas',
           typeId: null,
         },
