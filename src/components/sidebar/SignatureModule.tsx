@@ -12,7 +12,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { WormholeTypeSelect } from './WormholeTypeSelect';
 import { SignatureGroupSelect } from './SignatureGroupSelect';
@@ -385,28 +385,26 @@ export function SignatureModule({
   flashSigId?: string | null;
 }) {
   return (
-    <Card>
-      <CardContent>
-        {!system ? (
-          <p className="text-xs text-muted-foreground">
-            Select a system on the map to view its signatures.
-          </p>
-        ) : (
-          <SignaturePanelBody
-            key={system.id}
-            mapId={mapId}
-            system={system}
-            signatures={signatures}
-            connections={connections}
-            systems={systems}
-            onCreate={onCreate}
-            onPatch={onPatch}
-            onDelete={onDelete}
-            onConnectionPatch={onConnectionPatch}
-            flashSigId={flashSigId}
-          />
-        )}
-      </CardContent>
+    <Card className="flex h-full flex-col gap-3 p-3">
+      {!system ? (
+        <p className="text-xs text-muted-foreground">
+          Select a system on the map to view its signatures.
+        </p>
+      ) : (
+        <SignaturePanelBody
+          key={system.id}
+          mapId={mapId}
+          system={system}
+          signatures={signatures}
+          connections={connections}
+          systems={systems}
+          onCreate={onCreate}
+          onPatch={onPatch}
+          onDelete={onDelete}
+          onConnectionPatch={onConnectionPatch}
+          flashSigId={flashSigId}
+        />
+      )}
     </Card>
   );
 }
@@ -649,16 +647,16 @@ function SignaturePanelBody({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <SignatureFilterBar
         groupFilter={groupFilter}
         onGroupFilterChange={setGroupFilter}
         scanFilter={scanFilter}
         onScanFilterChange={setScanFilter}
       />
-      <div className="overflow-hidden rounded-md ring-1 ring-foreground/10">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-md ring-1 ring-foreground/10">
         <table className="w-full text-sm [&_[data-slot=input]]:h-6 [&_[data-slot=select-trigger]]:h-6">
-          <thead className="bg-muted/40 text-[11px] uppercase text-muted-foreground">
+          <thead className="sticky top-0 z-10 bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] text-[11px] uppercase text-muted-foreground">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => {
@@ -708,7 +706,7 @@ function SignaturePanelBody({
         </table>
       </div>
 
-      <div className="flex items-end gap-2">
+      <div className="flex shrink-0 items-end gap-2">
         <div className="flex flex-col gap-1">
           <span className="text-[11px] text-muted-foreground">Sig</span>
           <Input
@@ -879,7 +877,7 @@ function SignatureFilterBar({
     },
   };
   return (
-    <div className="flex flex-wrap items-center justify-between gap-1.5">
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-1.5">
       <div className="flex flex-wrap items-center gap-1">
         {SIGNATURE_GROUP_CATALOG.map(({ key, label }) => (
           <FilterToggle
