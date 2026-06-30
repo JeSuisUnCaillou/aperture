@@ -195,7 +195,7 @@ export function SignatureSearchModule({
       {/* Results table */}
       <div className="min-h-0 flex-1 overflow-y-auto rounded-md ring-1 ring-foreground/10">
         <table className="w-full text-sm">
-          <thead className="bg-muted/40 text-[11px] uppercase text-muted-foreground">
+          <thead className="sticky top-0 z-10 bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] text-[11px] uppercase text-muted-foreground">
             <tr>
               <th
                 className="w-16 px-2 py-0.5 text-left cursor-pointer select-none"
