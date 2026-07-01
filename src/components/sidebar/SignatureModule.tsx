@@ -34,7 +34,7 @@ import type {
   UpdateSignatureBody,
 } from '@/lib/map/client';
 import type { WhJumpMass } from '@/lib/map/enumLabels';
-import { fetchWormholeTypes } from '@/lib/map/client';
+import { fetchWormholeCatalog } from '@/lib/map/client';
 import { SIGNATURE_GROUP_CATALOG } from '@/lib/map/signatureGroups';
 import { formatAgoFromMs, formatRelativeFromMs } from '@/lib/map/relativeTime';
 import { cn } from '@/lib/utils';
@@ -137,20 +137,17 @@ type WormholeTypeMeta = {
 
 /**
  * Resolves `universe_wormhole.type_id` → its destination class and inferred
- * jump-mass band for the host system. The target class filters the "Leads to"
- * dropdown to connections the WH type could open onto; the jump-mass band drives
- * the auto-set of a linked connection's size. Reads from the same
- * per-(mapId, systemId) cache `WormholeTypeSelect` populates, so this is usually
- * a free in-memory hit rather than a second network round-trip.
+ * jump-mass band. The target class filters the "Leads to" dropdown to
+ * connections the WH type could open onto; the jump-mass band drives the
+ * auto-set of a linked connection's size. Both are system-independent catalog
+ * facts, so this reads the shared session-wide WH catalog `WormholeTypeSelect`
+ * also uses — usually a warm cache hit rather than a network round-trip.
  */
-function useWormholeTypeMeta(
-  mapId: string,
-  universeSystemId: number,
-): Map<number, WormholeTypeMeta> {
+function useWormholeTypeMeta(): Map<number, WormholeTypeMeta> {
   const [byTypeId, setByTypeId] = useState<Map<number, WormholeTypeMeta>>(new Map());
   useEffect(() => {
     let cancelled = false;
-    fetchWormholeTypes({ mapId, universeSystemId }).then((result) => {
+    fetchWormholeCatalog().then((result) => {
       if (cancelled || !result.ok) return;
       setByTypeId(
         new Map(
@@ -164,7 +161,7 @@ function useWormholeTypeMeta(
     return () => {
       cancelled = true;
     };
-  }, [mapId, universeSystemId]);
+  }, []);
   return byTypeId;
 }
 
@@ -174,7 +171,6 @@ function useWormholeTypeMeta(
  * the cell components below for why this indirection matters.
  */
 type SignatureTableMeta = {
-  mapId: string;
   system: MapSystemNode;
   connections: MapConnectionEdge[];
   systems: MapSystemNode[];
@@ -232,7 +228,7 @@ function GroupCell({ row, table }: CellContext<MapSignature, SignatureGroupKey |
 
 function TypeColumnCell({ row, table }: CellContext<MapSignature, unknown>) {
   const sig = row.original;
-  const { mapId, system, onPatch, syncConnectionSize } =
+  const { system, onPatch, syncConnectionSize } =
     table.options.meta as SignatureTableMeta;
   const typeMissing =
     sig.groupKey !== null &&
@@ -240,7 +236,6 @@ function TypeColumnCell({ row, table }: CellContext<MapSignature, unknown>) {
   return (
     <div className={`px-1 py-px${typeMissing ? ` ${MISSING_CELL}` : ''}`}>
       <TypeCell
-        mapId={mapId}
         system={system}
         sig={sig}
         onPatch={onPatch}
@@ -362,7 +357,6 @@ const signatureColumns = [
  * selected.
  */
 export function SignatureModule({
-  mapId,
   system,
   signatures,
   connections,
@@ -373,7 +367,6 @@ export function SignatureModule({
   onConnectionPatch,
   flashSigId = null,
 }: {
-  mapId: string;
   system: MapSystemNode | null;
   signatures: MapSignature[];
   connections: MapConnectionEdge[];
@@ -393,7 +386,6 @@ export function SignatureModule({
       ) : (
         <SignaturePanelBody
           key={system.id}
-          mapId={mapId}
           system={system}
           signatures={signatures}
           connections={connections}
@@ -518,7 +510,6 @@ function SignaturePasteButton({
 }
 
 function SignaturePanelBody({
-  mapId,
   system,
   signatures,
   connections,
@@ -529,7 +520,6 @@ function SignaturePanelBody({
   onConnectionPatch,
   flashSigId = null,
 }: {
-  mapId: string;
   system: MapSystemNode;
   signatures: MapSignature[];
   connections: MapConnectionEdge[];
@@ -545,7 +535,7 @@ function SignaturePanelBody({
     [signatures, system.id],
   );
 
-  const metaByTypeId = useWormholeTypeMeta(mapId, system.systemId);
+  const metaByTypeId = useWormholeTypeMeta();
 
   // Connections already claimed by a sig in this system. The sig↔connection
   // binding is 1:1, so these are hidden from the "Leads to" dropdown (each
@@ -608,7 +598,6 @@ function SignaturePanelBody({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     meta: {
-      mapId,
       system,
       connections,
       systems,
@@ -734,8 +723,8 @@ function SignaturePanelBody({
           <span className="text-[11px] text-muted-foreground">Type</span>
           {draftGroupKey === 'wormhole' ? (
             <WormholeTypeSelect
-              mapId={mapId}
-              universeSystemId={system.systemId}
+              systemSecurity={system.security}
+              staticTypeIds={system.staticTypeIds}
               value={draftTypeId}
               onValueChange={setDraftTypeId}
             />
@@ -781,7 +770,6 @@ function SignaturePanelBody({
  *   - null group → disabled placeholder.
  */
 function TypeCell({
-  mapId,
   system,
   sig,
   onPatch,
@@ -789,7 +777,6 @@ function TypeCell({
   triggerClassName,
   inputClassName,
 }: {
-  mapId: string;
   system: MapSystemNode;
   sig: MapSignature;
   onPatch: (signatureId: string, patch: UpdateSignatureBody) => void;
@@ -805,8 +792,8 @@ function TypeCell({
   if (sig.groupKey === 'wormhole') {
     return (
       <WormholeTypeSelect
-        mapId={mapId}
-        universeSystemId={system.systemId}
+        systemSecurity={system.security}
+        staticTypeIds={system.staticTypeIds}
         value={sig.typeId}
         onValueChange={(typeId) => {
           // Mirror the resolved WH code to `name` so the cell displays the
