@@ -49,7 +49,7 @@ const FAKE_CHARACTERS: { id: bigint; name: string; shipName: string; shipTypeId:
   { id: 2_000_000_005n, name: 'Zeph Orryn',     shipName: 'Quantum Drift',  shipTypeId: 28661 }, // Proteus
 ];
 
-async function main() {
+async function main(systemName: string) {
   // ── Cleanup ────────────────────────────────────────────────────────────────
 
   // Delete all Demo Overlay maps regardless of system name suffix, so leftover
@@ -74,7 +74,7 @@ async function main() {
     .where(
       and(
         eq(universeSystem.id, PLACEHOLDER_SYSTEM_ID),
-        eq(universeSystem.name, SYSTEM_NAME),
+        eq(universeSystem.name, systemName),
       ),
     );
   await db
@@ -89,15 +89,15 @@ async function main() {
   const [sdeSystem] = await db
     .select({ id: universeSystem.id })
     .from(universeSystem)
-    .where(eq(universeSystem.name, SYSTEM_NAME))
+    .where(eq(universeSystem.name, systemName))
     .limit(1);
 
   if (sdeSystem) {
     systemId = sdeSystem.id;
-    console.log(`Found ${SYSTEM_NAME} in SDE (id=${systemId}).`);
+    console.log(`Found ${systemName} in SDE (id=${systemId}).`);
   } else {
     // SDE not ingested — insert placeholder universe rows so the FK chain holds.
-    console.log(`${SYSTEM_NAME} not in SDE — inserting placeholder universe rows.`);
+    console.log(`${systemName} not in SDE — inserting placeholder universe rows.`);
     await db
       .insert(universeRegion)
       .values({ id: PLACEHOLDER_REGION_ID, name: 'Seed Placeholder Region' })
@@ -108,7 +108,7 @@ async function main() {
       .onConflictDoNothing();
     await db
       .insert(universeSystem)
-      .values({ id: PLACEHOLDER_SYSTEM_ID, constellationId: PLACEHOLDER_CONSTELLATION_ID, name: SYSTEM_NAME, security: 'C3' })
+      .values({ id: PLACEHOLDER_SYSTEM_ID, constellationId: PLACEHOLDER_CONSTELLATION_ID, name: systemName, security: 'C3' })
       .onConflictDoNothing();
     systemId = PLACEHOLDER_SYSTEM_ID;
   }
@@ -169,11 +169,11 @@ async function main() {
   );
 
   console.log(
-    `Seeded map "${MAP_NAME}" with ${SYSTEM_NAME} (id=${systemId}) and ${FAKE_CHARACTERS.length} fake online characters.`,
+    `Seeded map "${MAP_NAME}" with ${systemName} (id=${systemId}) and ${FAKE_CHARACTERS.length} fake online characters.`,
   );
 }
 
-main()
+main(SYSTEM_NAME)
   .then(async () => {
     await pool.end();
     process.exit(0);
