@@ -45,6 +45,7 @@ import {
 } from '@/lib/map/enumLabels';
 import { cn } from '@/lib/utils';
 import { SetDestinationItem } from './SetDestinationItem';
+import { AddToRoutesItem } from './AddToRoutesItem';
 
 /** Sentinel radio value for "jump mass unknown" — mirrors `InspectorModule.tsx`. */
 const NONE_JUMP_MASS = '__none__';
@@ -478,6 +479,8 @@ function SystemItems({
       </MenuItem>
 
       <SetDestinationItem system={system} onClose={onClose} />
+
+      <AddToRoutesItem system={system} onClose={onClose} />
 
       <MenuSubmenu>
         <MenuSubmenuTrigger inset>Status</MenuSubmenuTrigger>
