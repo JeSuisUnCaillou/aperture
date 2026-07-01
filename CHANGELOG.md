@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.0.0-rc.11
+
+This release adds an in-header Eve Time clock, turns signature search into a compact panel with anomaly/signature filtering, lets you send a system straight to the route planner from its context menu, and sharpens the D-Scan overlay comparison.
+
+### New features
+
+- **Eve Time (UTC) clock** in the app header, showing current EVE Online time with a downtime countdown and a popover of the same moment across key regional timezones. *(Ionis en Gravonere)*
+- **Signature search panel** - the signature search moves out of a dialog into a compact, reactive panel that works on narrower screens; clicking "Go" snaps to the system carrying the signature without changing zoom. *(Ionis en Gravonere)*
+- **Filter signatures by anomaly or signature status** - signature search can now narrow results to just anomalies or just signatures. *(Ionis en Gravonere)*
+- **"Add to routes" system action** - right-clicking a system offers "Add to routes", saving it as a route-planner destination for the account. It persists through the Server Action even when the route panel is hidden, and a mounted route planner folds the new destination in without a reload. *(MonoliYoda)*
+
+### Improvements
+
+- **D-Scan overlay comparison** now renders as a sortable table, making it easier to compare an overlay against a fresh D-Scan. *(Caillou)*
+- **Wormhole catalog fetched once per session** instead of per-dropdown, cutting redundant lookups when opening connection-type pickers and eliminating the flicker on wormhole signatures in the Signatures panel. *(MonoliYoda)*
+- **Sticky, opaque headers** on the Signatures panel and Signature Search so column headers stay readable while the table scrolls. *(MonoliYoda)*
+- **Autopilot destination clears existing waypoints** when set, so a new destination replaces the route rather than appending to it. *(MonoliYoda)*
+- **Add System button removed from the map toolbar** - adding a system remains available from the pane right-click menu. *(MonoliYoda)*
+- **Pilot-count badge** floats off the system node's top-left corner for a cleaner node layout. *(MonoliYoda)*
+- **Auto-placement gap widened to 20px** for a bit more breathing room between freshly placed systems. *(MonoliYoda)*
+
+### Fixes
+
+- **Re-added systems place correctly on jump** - a soft-hidden system that a tracked pilot jumped back into via a different chain reappeared at its stale coordinates from the prior chain. Placement is now recomputed whenever a system is made visible, fanning it off the system just jumped from; alias, tag, status and intel are still preserved across the re-add. *(MonoliYoda)*
+
+### Misc
+
+- Documented the companion-`.md` anti-bloat rules in `CLAUDE.md`. *(MonoliYoda)*
+
+### Contributors
+
+- **MonoliYoda** - "Add to routes" action, wormhole-catalog caching, sticky signature headers, autopilot waypoint clearing, toolbar/node cleanups, re-placement fix, docs
+- **Ionis en Gravonere** - Eve Time clock, signature search panel, anomaly/signature filtering
+- **Caillou** - D-Scan overlay comparison table
+
 ## v1.0.0-rc.10
 
 This release adds a full observability suite — metrics, an admin metrics page, instance alerting and client-error capture — and lets signature entries record whether they are a signature or an anomaly. It also refreshes the app's branding with the Aperture logo.

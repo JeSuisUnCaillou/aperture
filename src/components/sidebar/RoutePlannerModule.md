@@ -22,10 +22,12 @@ A `Card` ("Routes") with: a **controls row** with a **From** label and two toggl
 - **System mode source** — uses the `selectedSystemId` prop (the map's primary selection, updated every render when the user clicks a system).
 - **Recompute** — debounced (300ms) `POST /api/map/[mapId]/route-plan` whenever the source, prefs, destinations, or a connection signature (`id:scope:mass:eol:jumpMass`) changes; out-of-order responses are dropped via a seq ref; results stored locally.
 - **Persistence** — prefs changes optimistically update local state and fire `setRoutePrefsAction` in a transition; destination add/remove optimistically update the local list and call `addRouteDestinationAction` / `removeRouteDestinationAction`.
+- **External additions** — subscribes to `subscribeRouteDestinations`; a destination saved by the map context-menu "Add to routes" item is folded into the local list (deduped by `systemId`) so it appears without a reload.
 - `SystemSearchField` (inline) reuses `searchSystemsOnServer` (the map `system-search` endpoint) for both the manual-source fallback and add-destination typeaheads. Its result list (`SearchResults`) is **portalled to `document.body`** and pinned under the input via the input's `getBoundingClientRect()` (re-measured on capture-phase scroll + resize) — the enclosing `Card` is `overflow-hidden`, which would otherwise clip an absolutely-positioned dropdown at the card edge.
 
 ### Emits / Calls
 - `setRoutePrefsAction`, `addRouteDestinationAction`, `removeRouteDestinationAction` (`@/app/(app)/actions/routes`)
+- `subscribeRouteDestinations` (`@/lib/map/routeDestinationBus`) — folds context-menu "Add to routes" additions
 - `requestJson('POST', /api/map/<id>/route-plan)` → `RoutePlan[]`
 - `useMapActiveChar()` — reads `activeCharSystemId` (the active character's current location from presence data)
 - `searchSystemsOnServer` — system typeahead search for the manual-source fallback and add-destination fields

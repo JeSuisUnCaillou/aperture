@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ClipboardPaste, Search, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ClipboardPaste, Trash2 } from 'lucide-react';
 import {
   createColumnHelper,
   flexRender,
@@ -12,7 +12,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { WormholeTypeSelect } from './WormholeTypeSelect';
 import { SignatureGroupSelect } from './SignatureGroupSelect';
@@ -34,7 +34,7 @@ import type {
   UpdateSignatureBody,
 } from '@/lib/map/client';
 import type { WhJumpMass } from '@/lib/map/enumLabels';
-import { fetchWormholeTypes } from '@/lib/map/client';
+import { fetchWormholeCatalog } from '@/lib/map/client';
 import { SIGNATURE_GROUP_CATALOG } from '@/lib/map/signatureGroups';
 import { formatAgoFromMs, formatRelativeFromMs } from '@/lib/map/relativeTime';
 import { cn } from '@/lib/utils';
@@ -137,20 +137,17 @@ type WormholeTypeMeta = {
 
 /**
  * Resolves `universe_wormhole.type_id` → its destination class and inferred
- * jump-mass band for the host system. The target class filters the "Leads to"
- * dropdown to connections the WH type could open onto; the jump-mass band drives
- * the auto-set of a linked connection's size. Reads from the same
- * per-(mapId, systemId) cache `WormholeTypeSelect` populates, so this is usually
- * a free in-memory hit rather than a second network round-trip.
+ * jump-mass band. The target class filters the "Leads to" dropdown to
+ * connections the WH type could open onto; the jump-mass band drives the
+ * auto-set of a linked connection's size. Both are system-independent catalog
+ * facts, so this reads the shared session-wide WH catalog `WormholeTypeSelect`
+ * also uses — usually a warm cache hit rather than a network round-trip.
  */
-function useWormholeTypeMeta(
-  mapId: string,
-  universeSystemId: number,
-): Map<number, WormholeTypeMeta> {
+function useWormholeTypeMeta(): Map<number, WormholeTypeMeta> {
   const [byTypeId, setByTypeId] = useState<Map<number, WormholeTypeMeta>>(new Map());
   useEffect(() => {
     let cancelled = false;
-    fetchWormholeTypes({ mapId, universeSystemId }).then((result) => {
+    fetchWormholeCatalog().then((result) => {
       if (cancelled || !result.ok) return;
       setByTypeId(
         new Map(
@@ -164,7 +161,7 @@ function useWormholeTypeMeta(
     return () => {
       cancelled = true;
     };
-  }, [mapId, universeSystemId]);
+  }, []);
   return byTypeId;
 }
 
@@ -174,7 +171,6 @@ function useWormholeTypeMeta(
  * the cell components below for why this indirection matters.
  */
 type SignatureTableMeta = {
-  mapId: string;
   system: MapSystemNode;
   connections: MapConnectionEdge[];
   systems: MapSystemNode[];
@@ -232,7 +228,7 @@ function GroupCell({ row, table }: CellContext<MapSignature, SignatureGroupKey |
 
 function TypeColumnCell({ row, table }: CellContext<MapSignature, unknown>) {
   const sig = row.original;
-  const { mapId, system, onPatch, syncConnectionSize } =
+  const { system, onPatch, syncConnectionSize } =
     table.options.meta as SignatureTableMeta;
   const typeMissing =
     sig.groupKey !== null &&
@@ -240,7 +236,6 @@ function TypeColumnCell({ row, table }: CellContext<MapSignature, unknown>) {
   return (
     <div className={`px-1 py-px${typeMissing ? ` ${MISSING_CELL}` : ''}`}>
       <TypeCell
-        mapId={mapId}
         system={system}
         sig={sig}
         onPatch={onPatch}
@@ -362,7 +357,6 @@ const signatureColumns = [
  * selected.
  */
 export function SignatureModule({
-  mapId,
   system,
   signatures,
   connections,
@@ -373,7 +367,6 @@ export function SignatureModule({
   onConnectionPatch,
   flashSigId = null,
 }: {
-  mapId: string;
   system: MapSystemNode | null;
   signatures: MapSignature[];
   connections: MapConnectionEdge[];
@@ -385,38 +378,35 @@ export function SignatureModule({
   flashSigId?: string | null;
 }) {
   return (
-    <Card>
-      <CardContent>
-        {!system ? (
-          <p className="text-xs text-muted-foreground">
-            Select a system on the map to view its signatures.
-          </p>
-        ) : (
-          <SignaturePanelBody
-            key={system.id}
-            mapId={mapId}
-            system={system}
-            signatures={signatures}
-            connections={connections}
-            systems={systems}
-            onCreate={onCreate}
-            onPatch={onPatch}
-            onDelete={onDelete}
-            onConnectionPatch={onConnectionPatch}
-            flashSigId={flashSigId}
-          />
-        )}
-      </CardContent>
+    <Card className="flex h-full flex-col gap-3 p-3">
+      {!system ? (
+        <p className="text-xs text-muted-foreground">
+          Select a system on the map to view its signatures.
+        </p>
+      ) : (
+        <SignaturePanelBody
+          key={system.id}
+          system={system}
+          signatures={signatures}
+          connections={connections}
+          systems={systems}
+          onCreate={onCreate}
+          onPatch={onPatch}
+          onDelete={onDelete}
+          onConnectionPatch={onConnectionPatch}
+          flashSigId={flashSigId}
+        />
+      )}
     </Card>
   );
 }
 
 /**
- * Header actions for the Signatures panel — the **Search** button, **Lazy delete** arm toggle, and
+ * Header actions for the Signatures panel — the **Lazy delete** arm toggle and
  * the **Paste from scanner** button. Rendered into the `MapPanel` header
  * (`headerRight`) rather than inside the card, so they sit beside the panel
- * title alongside the drag handle and hide button. The search button is always
- * rendered; lazy delete and paste are only shown when a system is selected.
+ * title alongside the drag handle and hide button. Both are only shown when a
+ * system is selected.
  */
 export function SignatureModuleHeaderActions({
   mapId,
@@ -425,7 +415,6 @@ export function SignatureModuleHeaderActions({
   onBulkPaste,
   lazyDelete,
   onLazyDeleteChange,
-  onOpenSearch,
 }: {
   mapId: string;
   system: MapSystemNode | null;
@@ -433,14 +422,9 @@ export function SignatureModuleHeaderActions({
   onBulkPaste: (payloads: MapEventPayload[]) => void;
   lazyDelete: boolean;
   onLazyDeleteChange: (next: boolean) => void;
-  onOpenSearch: () => void;
 }) {
   return (
     <>
-      <Button type="button" variant="outline" size="sm" onClick={onOpenSearch}>
-        <Search className="size-3.5" />
-        Sig Search
-      </Button>
       {system && (
         <>
           <LazyDeleteToggle armed={lazyDelete} onArmedChange={onLazyDeleteChange} />
@@ -526,7 +510,6 @@ function SignaturePasteButton({
 }
 
 function SignaturePanelBody({
-  mapId,
   system,
   signatures,
   connections,
@@ -537,7 +520,6 @@ function SignaturePanelBody({
   onConnectionPatch,
   flashSigId = null,
 }: {
-  mapId: string;
   system: MapSystemNode;
   signatures: MapSignature[];
   connections: MapConnectionEdge[];
@@ -553,7 +535,7 @@ function SignaturePanelBody({
     [signatures, system.id],
   );
 
-  const metaByTypeId = useWormholeTypeMeta(mapId, system.systemId);
+  const metaByTypeId = useWormholeTypeMeta();
 
   // Connections already claimed by a sig in this system. The sig↔connection
   // binding is 1:1, so these are hidden from the "Leads to" dropdown (each
@@ -616,7 +598,6 @@ function SignaturePanelBody({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     meta: {
-      mapId,
       system,
       connections,
       systems,
@@ -655,16 +636,16 @@ function SignaturePanelBody({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <SignatureFilterBar
         groupFilter={groupFilter}
         onGroupFilterChange={setGroupFilter}
         scanFilter={scanFilter}
         onScanFilterChange={setScanFilter}
       />
-      <div className="overflow-hidden rounded-md ring-1 ring-foreground/10">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-md ring-1 ring-foreground/10">
         <table className="w-full text-sm [&_[data-slot=input]]:h-6 [&_[data-slot=select-trigger]]:h-6">
-          <thead className="bg-muted/40 text-[11px] uppercase text-muted-foreground">
+          <thead className="sticky top-0 z-10 bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] text-[11px] uppercase text-muted-foreground">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => {
@@ -714,7 +695,7 @@ function SignaturePanelBody({
         </table>
       </div>
 
-      <div className="flex items-end gap-2">
+      <div className="flex shrink-0 items-end gap-2">
         <div className="flex flex-col gap-1">
           <span className="text-[11px] text-muted-foreground">Sig</span>
           <Input
@@ -742,8 +723,8 @@ function SignaturePanelBody({
           <span className="text-[11px] text-muted-foreground">Type</span>
           {draftGroupKey === 'wormhole' ? (
             <WormholeTypeSelect
-              mapId={mapId}
-              universeSystemId={system.systemId}
+              systemSecurity={system.security}
+              staticTypeIds={system.staticTypeIds}
               value={draftTypeId}
               onValueChange={setDraftTypeId}
             />
@@ -789,7 +770,6 @@ function SignaturePanelBody({
  *   - null group → disabled placeholder.
  */
 function TypeCell({
-  mapId,
   system,
   sig,
   onPatch,
@@ -797,7 +777,6 @@ function TypeCell({
   triggerClassName,
   inputClassName,
 }: {
-  mapId: string;
   system: MapSystemNode;
   sig: MapSignature;
   onPatch: (signatureId: string, patch: UpdateSignatureBody) => void;
@@ -813,8 +792,8 @@ function TypeCell({
   if (sig.groupKey === 'wormhole') {
     return (
       <WormholeTypeSelect
-        mapId={mapId}
-        universeSystemId={system.systemId}
+        systemSecurity={system.security}
+        staticTypeIds={system.staticTypeIds}
         value={sig.typeId}
         onValueChange={(typeId) => {
           // Mirror the resolved WH code to `name` so the cell displays the
@@ -885,7 +864,7 @@ function SignatureFilterBar({
     },
   };
   return (
-    <div className="flex flex-wrap items-center justify-between gap-1.5">
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-1.5">
       <div className="flex flex-wrap items-center gap-1">
         {SIGNATURE_GROUP_CATALOG.map(({ key, label }) => (
           <FilterToggle

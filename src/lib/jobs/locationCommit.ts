@@ -150,10 +150,11 @@ async function ensureSystemVisible(
     return { mapSystemId: existing.id, emitted: false };
   }
 
-  // Only a truly fresh insert gets computed placement. A re-add of a hidden row
-  // takes the `onConflictDoUpdate` path below, whose `set` clause omits position
-  // and so preserves the system's prior coordinates.
-  const placement = existing ? null : await computePlacement(mapId, opts?.anchorSystemId);
+  // A hidden re-add is a brand-new appearance in a (usually) different chain, so
+  // its old coordinates are stale — recompute placement anchored on the system the
+  // pilot came from, same as a first-time insert. Metadata (alias/tag/status/intel)
+  // still rides through the `onConflictDoUpdate` path untouched.
+  const placement = await computePlacement(mapId, opts?.anchorSystemId);
 
   let mapSystemId: bigint | null = null;
   const result = await commitMapEvent({
@@ -168,12 +169,20 @@ async function ensureSystemVisible(
           mapId,
           systemId,
           visible: true,
-          ...(placement ? { positionX: placement.x, positionY: placement.y } : {}),
+          positionX: placement.x,
+          positionY: placement.y,
         })
         .onConflictDoUpdate({
           target: [apMapSystem.mapId, apMapSystem.systemId],
-          // Preserve alias/tag/status/intel/position on a re-add.
-          set: { visible: true, lastVisibleAt: now, updatedAt: now },
+          // Preserve alias/tag/status/intel on a re-add, but re-place the node:
+          // the old coordinates belong to a prior, now-defunct chain.
+          set: {
+            visible: true,
+            lastVisibleAt: now,
+            updatedAt: now,
+            positionX: placement.x,
+            positionY: placement.y,
+          },
         })
         .returning({ id: apMapSystem.id });
       mapSystemId = row!.id;

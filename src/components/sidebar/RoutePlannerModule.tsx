@@ -31,6 +31,7 @@ import {
   removeRouteDestinationAction,
   setRoutePrefsAction,
 } from '@/app/(app)/actions/routes';
+import { subscribeRouteDestinations } from '@/lib/map/routeDestinationBus';
 import type {
   MapConnectionEdge,
   RouteDestinationView,
@@ -200,6 +201,18 @@ export function RoutePlannerModule({
     setDestinations((prev) => prev.filter((d) => d.id !== id));
     await removeRouteDestinationAction(id);
   }, []);
+
+  // Fold destinations added elsewhere (the map context-menu "Add to routes" item
+  // persists + broadcasts them) so they appear without a reload.
+  useEffect(
+    () =>
+      subscribeRouteDestinations((dest) => {
+        setDestinations((prev) =>
+          prev.some((d) => d.systemId === dest.systemId) ? prev : [...prev, dest],
+        );
+      }),
+    [],
+  );
 
   const planBySystem = useMemo(() => {
     const m = new Map<number, RoutePlan>();

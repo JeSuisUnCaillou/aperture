@@ -1,6 +1,6 @@
 ## route.ts (POST /api/character/waypoint)
 
-**Purpose:** Append an on-map system as an autopilot waypoint on one of the signed-in user's own characters, via ESI. A side-effect call into the EVE client — writes **no** `ap_map_event`.
+**Purpose:** Set an on-map system as the autopilot destination on one of the signed-in user's own characters, clearing any existing waypoints, via ESI. A side-effect call into the EVE client — writes **no** `ap_map_event`.
 **File:** `src/app/api/character/waypoint/route.ts`
 
 ---
@@ -12,7 +12,7 @@ Backs the map's "Set destination" context-menu action.
 - Requires a session (`getSession`); 401 when unauthenticated.
 - Body (Zod): `{ characterId: number, destinationId: number }` — both positive ints; `destinationId` is an EVE solar-system id. Invalid JSON / shape → 400.
 - Ownership: `assertCharacterOwnership(BigInt(characterId), session.userId)` → 403 when the character isn't the user's (or isn't `active`).
-- Calls `esiCall('setWaypoint', { schema: z.null(), characterId, query: { destination_id, add_to_beginning: false, clear_other_waypoints: false } })` — **append** semantics (existing route preserved). The 204 reply decodes as `null`.
+- Calls `esiCall('setWaypoint', { schema: z.null(), characterId, query: { destination_id, add_to_beginning: false, clear_other_waypoints: true } })` — **replace** semantics (existing waypoints cleared, this system becomes the sole destination). The 204 reply decodes as `null`.
 - Returns `{ ok: true }`. On `EsiTokenError` or `EsiHttpError` 401/403 (token predates the `esi-ui.write_waypoint.v1` scope) → `{ ok: false, error: 'Sign out and back in to enable Set destination.' }` (status 400). Any other failure → generic 502.
 
 ### Depends On

@@ -30,6 +30,7 @@ const sys1: MapSystemNode = {
   regionName: 'The Forge',
   constellationName: 'Kimotoro',
   statics: [],
+  staticTypeIds: [],
   tradeHub: null,
   locked: false,
   rallyAt: null,

@@ -92,7 +92,7 @@ import {
   SignatureModule,
   SignatureModuleHeaderActions,
 } from '@/components/sidebar/SignatureModule';
-import { Download, Info, LayoutDashboard, Plus, RotateCcw, ScrollText, Search, Settings, Trash2, Upload, User } from 'lucide-react';
+import { Download, Info, LayoutDashboard, RotateCcw, ScrollText, Settings, Trash2, Upload, User } from 'lucide-react';
 import { Tooltip } from '@base-ui/react/tooltip';
 import { Button } from '@/components/ui/button';
 import {
@@ -115,7 +115,7 @@ import { PilotRosterButton } from './PilotRosterButton';
 import { SystemOverlayButton } from './SystemOverlayButton';
 import { MapSettingsDialog } from '@/components/dialogs/MapSettingsDialog';
 import { MapAuditDialog } from '@/components/map/manage/MapAuditDialog';
-import { SignatureSearchDialog } from '@/components/dialogs/SignatureSearchDialog';
+import { SignatureSearchModule } from '@/components/sidebar/SignatureSearchModule';
 import { AddSystemDialog } from './AddSystemDialog';
 import { ConnectionEdge, type ConnectionEdgeData } from './ConnectionEdge';
 import { MapPresenceProvider } from './MapPresenceContext';
@@ -317,12 +317,13 @@ export function MapCanvas({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [addSystemOpen, setAddSystemOpen] = useState(false);
-  const [sigSearchOpen, setSigSearchOpen] = useState(false);
   const [sigSearchFilters, setSigSearchFilters] = useState<SigSearchFilters>({
     name: '',
     groupKey: null,
     maxAgeHours: null,
     securityClasses: [],
+    includeAnomalies: true,
+    includeSignatures: true,
   });
   const [flashSigId, setFlashSigId] = useState<string | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -573,10 +574,19 @@ export function MapCanvas({
   );
 
   const handleNavigateToSig = useCallback((systemId: string, sigId: string) => {
-    setSigSearchOpen(false);
     setSelected({ kind: 'system', id: systemId });
     setSelectedSystemIds(new Set([systemId]));
-    flowInstance.current?.fitView({ nodes: [{ id: systemId }], padding: 0.5, duration: 400 });
+    const inst = flowInstance.current;
+    const node = inst?.getNode(systemId);
+    if (inst && node) {
+      const w = node.measured?.width ?? node.width ?? 0;
+      const h = node.measured?.height ?? node.height ?? 0;
+      // Snap (no animation) to the system, preserving the current zoom level.
+      inst.setCenter(node.position.x + w / 2, node.position.y + h / 2, {
+        zoom: inst.getZoom(),
+        duration: 0,
+      });
+    }
     if (flashTimer.current) clearTimeout(flashTimer.current);
     setFlashSigId(sigId);
     flashTimer.current = setTimeout(() => setFlashSigId(null), 3000);
@@ -1604,7 +1614,6 @@ export function MapCanvas({
                 </Button>
               )}
             <TransitSignaturePrompt
-              mapId={mapId}
               systems={viewData.systems}
               connections={viewData.connections}
               signatures={viewData.signatures}
@@ -1712,7 +1721,6 @@ export function MapCanvas({
       case 'signatures':
         return (
           <SignatureModule
-            mapId={mapId}
             system={selectedSystem}
             signatures={viewData.signatures}
             connections={viewData.connections}
@@ -1722,6 +1730,16 @@ export function MapCanvas({
             onDelete={onSignatureDelete}
             onConnectionPatch={onConnectionPatch}
             flashSigId={flashSigId}
+          />
+        );
+      case 'sigSearch':
+        return (
+          <SignatureSearchModule
+            signatures={viewData.signatures}
+            systems={viewData.systems}
+            filters={sigSearchFilters}
+            onFiltersChange={setSigSearchFilters}
+            onNavigate={handleNavigateToSig}
           />
         );
       case 'inspector':
@@ -1792,7 +1810,6 @@ export function MapCanvas({
           onBulkPaste={onSignaturePasteResult}
           lazyDelete={lazyDeleteSigs}
           onLazyDeleteChange={setLazyDeleteSigs}
-          onOpenSearch={() => setSigSearchOpen(true)}
         />
       );
     }
@@ -1882,15 +1899,6 @@ export function MapCanvas({
                   if (file) void handleImportFile(file);
                 }}
               />
-              <Button variant="ghost" size="sm" onClick={() => setAddSystemOpen(true)}>
-                <Plus />
-                Add system
-              </Button>
-
-              <Button variant="ghost" size="sm" onClick={() => setSigSearchOpen(true)}>
-                <Search />
-                Sig Search
-              </Button>
               <Button variant="ghost" size="sm" onClick={() => setMapInfoOpen(true)}>
                 <Info />
                 Map info
@@ -1950,15 +1958,6 @@ export function MapCanvas({
           mapId={mapId}
           existingSystemIds={existingSystemIds}
           onAdd={onAddSystem}
-        />
-        <SignatureSearchDialog
-          open={sigSearchOpen}
-          onOpenChange={setSigSearchOpen}
-          signatures={viewData.signatures}
-          systems={viewData.systems}
-          filters={sigSearchFilters}
-          onFiltersChange={setSigSearchFilters}
-          onNavigate={handleNavigateToSig}
         />
         </MapSignatureIndicatorProvider>
         </MapUnderglowProvider>

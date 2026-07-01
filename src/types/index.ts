@@ -404,7 +404,8 @@ export type {
 } from '@/lib/map/mutations/restoreConnection';
 
 // Wormhole-catalog lookup result types (src/lib/map/wormholeTypes.ts).
-export type { WormholeTypeOption, StaticMatch } from '@/lib/map/wormholeTypes';
+export type { WormholeCatalogEntry, WormholeTypeOption } from '@/lib/map/wormholeCatalog';
+export type { StaticMatch } from '@/lib/map/wormholeTypes';
 
 // Solar-system name search result (src/lib/map/systemSearch.ts).
 export type { SystemSearchResult } from '@/lib/map/systemSearch';
@@ -500,6 +501,7 @@ export type UnderglowConfig = {
 export type PanelId =
   | 'canvas'
   | 'signatures'
+  | 'sigSearch'
   | 'inspector'
   | 'route'
   | 'intel'
@@ -539,13 +541,17 @@ export type MapContextMenuTarget =
   | { kind: 'note'; id: string; x: number; y: number }
   | { kind: 'pane'; x: number; y: number };
 
-/** Filter state for `SignatureSearchDialog`. Owned by `MapCanvas` so it persists between opens. */
+/** Filter state for the `sigSearch` panel (`SignatureSearchModule`). Owned by `MapCanvas` so it persists across the session. */
 export type SigSearchFilters = {
   name: string;
   groupKey: SignatureGroupKey | null;
   maxAgeHours: number | null;
   /** `MapSystemNode.security` labels to include; empty = all. */
   securityClasses: string[];
+  /** Show sigs classed as Cosmic Anomaly. Sigs with no group bypass this. */
+  includeAnomalies: boolean;
+  /** Show sigs classed as Cosmic Signature. Sigs with no group bypass this. */
+  includeSignatures: boolean;
 };
 
 // --- Observability: health probe (Phase 1) ---
@@ -591,6 +597,9 @@ export type EsiMetricOutcome =
   | 'downtime'
   | 'rate_limited'
   | 'token_error';
+
+/** Display phase for the Eve-time clock around CCP's daily downtime. */
+export type EveClockPhase = 'normal' | 'pre' | 'downtime';
 
 /** Outcome label for `job_runs_total` — the `withInstrumentation` choke point. */
 export type JobOutcome = 'success' | 'failure';
