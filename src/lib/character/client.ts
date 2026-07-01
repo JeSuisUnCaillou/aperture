@@ -7,9 +7,10 @@ import { requestJson } from '@/lib/http/fetchJson';
  */
 
 /**
- * Append `destinationId` (an EVE solar-system id) as an autopilot waypoint on
- * the given character's in-game route. Backs the "Set destination" context-menu
- * action. The character must belong to the signed-in user.
+ * Set `destinationId` (an EVE solar-system id) as the autopilot destination on
+ * the given character's in-game route, clearing any existing waypoints. Backs
+ * the "Set destination" context-menu action. The character must belong to the
+ * signed-in user.
  */
 export function setWaypointOnServer(args: {
   characterId: number;

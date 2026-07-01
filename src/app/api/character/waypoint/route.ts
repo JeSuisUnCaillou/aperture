@@ -6,10 +6,10 @@ import { esiCall, EsiHttpError, EsiTokenError } from '@/lib/esi/client';
 import { withApiMetrics } from '@/lib/metrics/httpInstrumentation';
 
 /**
- * POST /api/character/waypoint — append an on-map system as an autopilot
- * waypoint on one of the signed-in user's own characters (the map's "active"
- * character). Writes no map event: this is a side-effect call into the EVE
- * client via ESI, not a map mutation.
+ * POST /api/character/waypoint — set an on-map system as the autopilot
+ * destination on one of the signed-in user's own characters (the map's "active"
+ * character), clearing any existing waypoints. Writes no map event: this is a
+ * side-effect call into the EVE client via ESI, not a map mutation.
  *
  * Requires the `esi-ui.write_waypoint.v1` scope. A token that predates the
  * scope (401/403) surfaces a re-login prompt rather than a generic failure.
@@ -56,7 +56,7 @@ export const POST = withApiMetrics('/api/character/waypoint', async function POS
       query: {
         destination_id: destinationId,
         add_to_beginning: false,
-        clear_other_waypoints: false,
+        clear_other_waypoints: true,
       },
     });
     return Response.json({ ok: true });
