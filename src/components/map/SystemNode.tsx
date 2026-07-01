@@ -13,7 +13,6 @@ import {
   Radiation,
   Signal,
   Swords,
-  Users,
   type LucideIcon,
 } from 'lucide-react';
 import type { MapPresenceEntry, MapSystemNode } from '@/lib/map/loadMap';
@@ -169,6 +168,7 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
           store glow below so a coinciding killmail/ping can't clear it. */}
       {data.rallyAt && <SystemUnderglow {...RALLY_UNDERGLOW} />}
       {glow && <SystemUnderglow key={glow.token} {...glow.config} />}
+      {pilots.length > 0 && <PresenceBadge pilots={pilots} />}
       <SignatureIndicators
         stale={sigIndicator.stale}
         ageMs={sigIndicator.ageMs}
@@ -262,7 +262,6 @@ export function SystemNode({ data, selected }: NodeProps & { data: SystemNodeDat
                 {data.alias ?? displayName}
               </span>
             )}
-            {pilots.length > 0 && <PresenceBadge pilots={pilots} />}
             {data.tradeHub && (
               <IndicatorPill
                 className="text-emerald-400 ring-emerald-400/40"
@@ -521,27 +520,38 @@ function EffectIndicator({ effect, classId }: { effect: SystemEffectKey; classId
   );
 }
 
+/**
+ * Tracked-pilot count, floating just off the top-left corner of the tile —
+ * mirroring the sig / intel indicator clusters on the right edge, tinted with
+ * the primary accent to read as the one live badge. `pointer-events-none` on the
+ * wrapper keeps it from swallowing node clicks; the trigger re-enables pointer
+ * events and carries `nodrag nopan` so the hover panel never starts a canvas
+ * pan/drag. Hover/focus opens a `SystemPresenceTable` of this system's pilots.
+ */
 function PresenceBadge({ pilots }: { pilots: readonly MapPresenceEntry[] }) {
   return (
-    <PreviewCard.Root>
-      <PreviewCard.Trigger
-        // `nodrag nopan` so opening the hover panel doesn't trigger xyflow's
-        // pan/drag — same pattern as InlineTextEdit. Render as a button so
-        // it's keyboard-focusable; default `<a>` would suggest a navigation.
-        render={<button type="button" />}
-        className="nodrag nopan inline-flex items-center gap-0.5 rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-tight text-primary-foreground"
-        aria-label={`${pilots.length} pilot${pilots.length === 1 ? '' : 's'} in system`}
-      >
-        <Users className="size-2.5" aria-hidden />
-        {pilots.length}
-      </PreviewCard.Trigger>
-      <PreviewCard.Portal>
-        <PreviewCard.Positioner sideOffset={4} side="top" align="end">
-          <PreviewCard.Popup className="nodrag nopan z-50 min-w-40 rounded-md border bg-popover p-0 text-xs text-popover-foreground shadow-md">
-            <SystemPresenceTable presence={pilots} />
-          </PreviewCard.Popup>
-        </PreviewCard.Positioner>
-      </PreviewCard.Portal>
-    </PreviewCard.Root>
+    // Anchor the pill's bottom-right corner near the tile's top-left corner
+    // (`-translate-x-full -translate-y-full`) so it grows up and to the left as
+    // the count widens, staying clear of the security-class label below it.
+    <div className="nodrag nopan pointer-events-none absolute left-1.5 top-1.5 flex -translate-x-full -translate-y-full items-center gap-1">
+      <PreviewCard.Root>
+        <PreviewCard.Trigger
+          // Render as a button so it's keyboard-focusable; default `<a>` would
+          // suggest a navigation.
+          render={<button type="button" />}
+          className="nodrag nopan pointer-events-auto inline-flex items-center rounded-full bg-card px-2 py-1 text-sm font-semibold leading-none text-primary shadow-sm ring-1 ring-primary/40"
+          aria-label={`${pilots.length} pilot${pilots.length === 1 ? '' : 's'} in system`}
+        >
+          {pilots.length}
+        </PreviewCard.Trigger>
+        <PreviewCard.Portal>
+          <PreviewCard.Positioner sideOffset={4} side="top" align="start">
+            <PreviewCard.Popup className="nodrag nopan z-50 min-w-40 rounded-md border bg-popover p-0 text-xs text-popover-foreground shadow-md">
+              <SystemPresenceTable presence={pilots} />
+            </PreviewCard.Popup>
+          </PreviewCard.Positioner>
+        </PreviewCard.Portal>
+      </PreviewCard.Root>
+    </div>
   );
 }
