@@ -45,7 +45,7 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 
 **Wormhole / signature lifetimes**
 - `WORMHOLE_EOL_LIFETIME_MS` (4h + 15% / 36m buffer), `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (1h + 15m), `WORMHOLE_DEFAULT_LIFETIME_MS` (48h) — drive the canvas countdowns and the reap-job purge thresholds.
-- `SIGNATURE_DEFAULT_TTL_MS` — default `expires_at` offset for new signatures (5 days).
+- `SIGNATURE_DEFAULT_TTL_MS` — default `expires_at` offset for new signatures (48 hours).
 
 **Job runtime / instrumentation**
 - `JOB_WORKER_CONCURRENCY`, `JOB_POLL_INTERVAL_MS` — graphile-worker concurrency and fallback poll cadence (LISTEN/NOTIFY drives the fast path).

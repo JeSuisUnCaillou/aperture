@@ -247,9 +247,10 @@ export const apertureConfig = {
 
   /**
    * Default TTL applied to a newly created signature (`expires_at = created_at +
-   * this`): 5 days.
+   * this`): 48 hours — the maximum a wormhole can stay open in EVE, so a sig
+   * nobody has re-scanned in that long is presumed gone.
    */
-  SIGNATURE_DEFAULT_TTL_MS: 259_200_000,
+  SIGNATURE_DEFAULT_TTL_MS: 172_800_000,
 
   /**
    * graphile-worker concurrency: how many task handlers may run in parallel in

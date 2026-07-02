@@ -36,7 +36,7 @@ import type {
 import type { WhJumpMass } from '@/lib/map/enumLabels';
 import { fetchWormholeCatalog } from '@/lib/map/client';
 import { SIGNATURE_GROUP_CATALOG } from '@/lib/map/signatureGroups';
-import { formatAgoFromMs, formatRelativeFromMs } from '@/lib/map/relativeTime';
+import { formatAgoFromMs } from '@/lib/map/relativeTime';
 import { cn } from '@/lib/utils';
 import { apertureConfig } from '../../../aperture.config';
 
@@ -95,7 +95,6 @@ const colHeaderClass: Record<string, string> = {
   type: 'w-56 px-3 py-0.5 text-left',
   description: 'px-3 py-0.5 text-left',
   leadsTo: 'w-44 px-3 py-0.5 text-left',
-  ttl: 'w-16 px-1 py-0.5 text-left',
   createdAt: 'w-24 px-1 py-0.5 text-left',
   updatedAt: 'w-24 px-1 py-0.5 text-left',
   actions: 'w-10 px-1 py-0.5',
@@ -114,12 +113,6 @@ function buildGroupChangePatch(
 
 function defaultExpiry(): string {
   return new Date(Date.now() + apertureConfig.SIGNATURE_DEFAULT_TTL_MS).toISOString();
-}
-
-function formatRelativeIso(iso: string): string {
-  const ts = new Date(iso).getTime();
-  if (Number.isNaN(ts)) return iso;
-  return formatRelativeFromMs(ts - Date.now());
 }
 
 function formatAgoIso(iso: string): string {
@@ -296,14 +289,6 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
   );
 }
 
-function TtlCell({ row }: CellContext<MapSignature, unknown>) {
-  return (
-    <span className="px-1 py-px text-xs text-muted-foreground">
-      {formatRelativeIso(row.original.expiresAt)}
-    </span>
-  );
-}
-
 function CreatedCell({ row }: CellContext<MapSignature, string>) {
   return (
     <span className="px-1 py-px text-xs text-muted-foreground">
@@ -344,7 +329,6 @@ const signatureColumns = [
   columnHelper.display({ id: 'type', header: 'Type', cell: TypeColumnCell }),
   columnHelper.display({ id: 'description', header: 'Description', cell: DescriptionCell }),
   columnHelper.display({ id: 'leadsTo', header: 'Leads to', cell: LeadsToCell }),
-  columnHelper.display({ id: 'ttl', header: 'TTL', cell: TtlCell }),
   columnHelper.accessor('createdAt', { header: 'Created', enableSorting: true, cell: CreatedCell }),
   columnHelper.accessor('updatedAt', { header: 'Updated', enableSorting: true, cell: UpdatedCell }),
   columnHelper.display({ id: 'actions', header: '', cell: ActionsCell }),

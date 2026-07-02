@@ -1,6 +1,6 @@
 ## relativeTime.ts
 
-**Purpose:** Pure helpers that render a millisecond delta as a relative-time string. `formatRelativeFromMs` is a forward countdown (`23h`, `2d`, `expired`); `formatAgoFromMs` is a backward "time ago" (`5m ago` / `5 minutes ago`). Shared by the signature TTL / Created / Updated columns, the connection EOL countdown, and the killboard feed.
+**Purpose:** Pure helpers that render a millisecond delta as a relative-time string. `formatRelativeFromMs` is a forward countdown (`23h`, `2d`, `expired`); `formatAgoFromMs` is a backward "time ago" (`5m ago` / `5 minutes ago`). Shared by the signature Created / Updated columns, the connection EOL countdown, and the killboard feed.
 **File:** `src/lib/map/relativeTime.ts`
 
 ---
