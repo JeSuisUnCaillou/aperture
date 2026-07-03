@@ -10,6 +10,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { universeSystem } from '../universe/geography';
+import { apCharacter } from './character';
 import { systemStatus } from './enums';
 import { apMap } from './map';
 
@@ -37,6 +38,13 @@ export const apMapSystem = pgTable(
     status: systemStatus('status').notNull().default('unknown'),
     intelNotes: text('intel_notes'),
     locked: boolean('locked').notNull().default(false),
+    // Who currently holds the lock. Stamped when `locked` flips true, NULLed when
+    // it flips false. SET NULL: erasing a character must not cascade-wipe the
+    // systems they locked.
+    lockedByCharacterId: bigint('locked_by_character_id', { mode: 'bigint' }).references(
+      () => apCharacter.id,
+      { onDelete: 'set null' },
+    ),
     // Non-null ⇒ a rally point is active.
     rallyAt: timestamp('rally_at', { withTimezone: true }),
     firstAddedAt: timestamp('first_added_at', { withTimezone: true }).notNull().defaultNow(),

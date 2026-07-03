@@ -62,6 +62,8 @@ const SYSTEM: MapSystemNode = {
   staticTypeIds: [],
   tradeHub: null,
   locked: false,
+  lockedByCharacterId: null,
+  lockedByName: null,
   rallyAt: null,
   positionX: 0,
   positionY: 0,

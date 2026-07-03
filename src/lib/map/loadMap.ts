@@ -71,6 +71,10 @@ export type MapSystemNode = {
   /** Nearest trade hub within high-sec range (precomputed at SDE ingest); null when none. */
   tradeHub: { name: string; jumps: number } | null;
   locked: boolean;
+  /** EVE character id of the current lock holder; null when unlocked or the character was erased. */
+  lockedByCharacterId: number | null;
+  /** Resolved lock-holder name; null when unlocked or the character row is gone. */
+  lockedByName: string | null;
   /** ISO timestamp when the rally point was set; null when no rally is active. */
   rallyAt: string | null;
   positionX: number;
@@ -283,6 +287,7 @@ export async function loadMapForView(
     .where(and(eq(apMap.id, mapId), isNull(apMap.deletedAt)));
   if (!map) return null;
 
+  const systemLocker = alias(apCharacter, 'system_locker');
   const systemRows = await db
     .select({
       id: apMapSystem.id,
@@ -292,6 +297,8 @@ export async function loadMapForView(
       intelNotes: apMapSystem.intelNotes,
       status: apMapSystem.status,
       locked: apMapSystem.locked,
+      lockedByCharacterId: apMapSystem.lockedByCharacterId,
+      lockedByName: systemLocker.name,
       rallyAt: apMapSystem.rallyAt,
       positionX: apMapSystem.positionX,
       positionY: apMapSystem.positionY,
@@ -308,6 +315,7 @@ export async function loadMapForView(
     .innerJoin(universeSystem, eq(apMapSystem.systemId, universeSystem.id))
     .innerJoin(universeConstellation, eq(universeSystem.constellationId, universeConstellation.id))
     .innerJoin(universeRegion, eq(universeConstellation.regionId, universeRegion.id))
+    .leftJoin(systemLocker, eq(systemLocker.id, apMapSystem.lockedByCharacterId))
     .where(and(eq(apMapSystem.mapId, mapId), eq(apMapSystem.visible, true)))
     .orderBy(apMapSystem.id);
 
@@ -412,6 +420,9 @@ export async function loadMapForView(
             }
           : null,
       locked: s.locked,
+      lockedByCharacterId:
+        s.lockedByCharacterId === null ? null : Number(s.lockedByCharacterId),
+      lockedByName: s.lockedByName,
       rallyAt: s.rallyAt ? s.rallyAt.toISOString() : null,
       positionX: s.positionX,
       positionY: s.positionY,

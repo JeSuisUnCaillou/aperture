@@ -1,6 +1,8 @@
 import { eq, inArray } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { db } from '@/db/client';
 import {
+  apCharacter,
   apMapSignature,
   apMapSystem,
   universeConstellation,
@@ -38,6 +40,7 @@ export async function buildSystemNode(
   tx: Tx,
   mapSystemId: bigint,
 ): Promise<MapEventPatch<'system.added'>> {
+  const locker = alias(apCharacter, 'system_locker');
   const [row] = await tx
     .select({
       id: apMapSystem.id,
@@ -47,6 +50,8 @@ export async function buildSystemNode(
       intelNotes: apMapSystem.intelNotes,
       status: apMapSystem.status,
       locked: apMapSystem.locked,
+      lockedByCharacterId: apMapSystem.lockedByCharacterId,
+      lockedByName: locker.name,
       rallyAt: apMapSystem.rallyAt,
       positionX: apMapSystem.positionX,
       positionY: apMapSystem.positionY,
@@ -63,6 +68,7 @@ export async function buildSystemNode(
     .innerJoin(universeSystem, eq(apMapSystem.systemId, universeSystem.id))
     .innerJoin(universeConstellation, eq(universeSystem.constellationId, universeConstellation.id))
     .innerJoin(universeRegion, eq(universeConstellation.regionId, universeRegion.id))
+    .leftJoin(locker, eq(locker.id, apMapSystem.lockedByCharacterId))
     .where(eq(apMapSystem.id, mapSystemId));
   if (!row) throw new Error('System row vanished mid-transaction.');
 
@@ -101,6 +107,9 @@ export async function buildSystemNode(
           }
         : null,
     locked: row.locked,
+    lockedByCharacterId:
+      row.lockedByCharacterId === null ? null : Number(row.lockedByCharacterId),
+    lockedByName: row.lockedByName,
     rallyAt: row.rallyAt ? row.rallyAt.toISOString() : null,
     positionX: row.positionX,
     positionY: row.positionY,

@@ -242,6 +242,9 @@ function SystemInspector({
               onChange={(e) => onPatch({ locked: e.target.checked })}
             />
             <span>Locked</span>
+            {system.locked && system.lockedByName && (
+              <span className="text-[10px] text-muted-foreground">by {system.lockedByName}</span>
+            )}
           </label>
           <Button
             type="button"

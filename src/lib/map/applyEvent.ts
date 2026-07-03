@@ -51,7 +51,11 @@ export function applyEvent(state: MapViewData, payload: MapEventPayload): MapVie
           if (payload.tag !== undefined) next.tag = payload.tag;
           if (payload.intelNotes !== undefined) next.intelNotes = payload.intelNotes;
           if (payload.status !== undefined) next.status = payload.status;
-          if (payload.locked !== undefined) next.locked = payload.locked;
+          if (payload.locked !== undefined) {
+            next.locked = payload.locked;
+            next.lockedByCharacterId = payload.lockedByCharacterId ?? null;
+            next.lockedByName = payload.lockedByName ?? null;
+          }
           if (payload.positionX !== undefined) next.positionX = payload.positionX;
           if (payload.positionY !== undefined) next.positionY = payload.positionY;
           if (payload.rallyAt !== undefined) next.rallyAt = payload.rallyAt;
