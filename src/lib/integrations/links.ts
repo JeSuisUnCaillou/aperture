@@ -10,8 +10,8 @@ function dotlanName(systemName: string): string {
   return encodeURIComponent(systemName.replaceAll(' ', '_'));
 }
 
-export function dotlanSystemUrl(systemName: string): string {
-  return `${DOTLAN_BASE}/system/${dotlanName(systemName)}`;
+export function dotlanMapUrl(regionName: string, systemName: string): string {
+  return `${DOTLAN_BASE}/map/${dotlanName(regionName)}/${dotlanName(systemName)}`;
 }
 
 export function eveeyeSystemUrl(systemId: number): string {
