@@ -203,9 +203,24 @@ function PilotRow({
       <Td>
         <LocationCell p={p} systemNameById={systemNameById} />
       </Td>
-      <Td className="text-muted-foreground">{p.shipTypeName ?? '—'}</Td>
-      <Td className="text-muted-foreground">{customShipName(p) || '—'}</Td>
+      <ClippedTd className="text-muted-foreground">{p.shipTypeName ?? '—'}</ClippedTd>
+      <ClippedTd className="text-muted-foreground">{customShipName(p) || '—'}</ClippedTd>
     </tr>
+  );
+}
+
+/**
+ * A `Td` whose content clips to a responsive max width with an ellipsis and
+ * exposes the full value via a native tooltip. The inner `block` span is
+ * required because `truncate` does not clip reliably on a bare table cell.
+ */
+function ClippedTd({ className, children }: { className?: string; children: string }) {
+  return (
+    <Td className={className}>
+      <span className="block max-w-[120px] truncate lg:max-w-[200px]" title={children}>
+        {children}
+      </span>
+    </Td>
   );
 }
 
