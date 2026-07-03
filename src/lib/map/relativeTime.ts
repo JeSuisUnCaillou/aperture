@@ -1,6 +1,6 @@
 /**
- * Compact human-readable relative-time formatter used by sig TTLs and the
- * connection EOL countdown. Pure (no `Date.now()` dependency at the call site
+ * Compact human-readable relative-time formatter used by the connection EOL
+ * countdown. Pure (no `Date.now()` dependency at the call site
  * is the caller's responsibility — pass the already-computed delta in).
  *
  * Rounding: hours rounded to the nearest hour up to 24h, then days rounded to

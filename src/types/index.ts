@@ -37,6 +37,7 @@ import type {
   universeSystemStatic,
   universeSovereigntyMap,
   universeFactionWarSystem,
+  universeKillmail,
   universeType,
   universeTypeAttribute,
   universeTypeOverride,
@@ -101,6 +102,9 @@ export type NewUniverseFactionWarSystem = InferInsertModel<typeof universeFactio
 
 export type UniverseWormhole = InferSelectModel<typeof universeWormhole>;
 export type NewUniverseWormhole = InferInsertModel<typeof universeWormhole>;
+
+export type UniverseKillmail = InferSelectModel<typeof universeKillmail>;
+export type NewUniverseKillmail = InferInsertModel<typeof universeKillmail>;
 
 export type ApUser = InferSelectModel<typeof apUser>;
 export type NewApUser = InferInsertModel<typeof apUser>;
@@ -666,6 +670,9 @@ export type MetricsSnapshot = {
  * Instantaneous gauges sampled at scrape/snapshot time. Not held in the
  * registry — they're computed on demand from the DB and the live process.
  */
+/** One table's estimated row count (`pg_class.reltuples`), partitions summed under the parent. */
+export type TableRowEstimate = { table: string; rows: number };
+
 export type GaugeReadings = {
   trackedCharacters: number;
   visibleSystems: number;
@@ -680,6 +687,8 @@ export type GaugeReadings = {
   processHeapUsedBytes: number;
   processHeapTotalBytes: number;
   eventLoopLagMs: number;
+  /** Per-table row estimates; rendered as the labelled `db_table_rows{table}` gauge. */
+  tableRows: TableRowEstimate[];
 };
 
 // --- Observability: metrics history (Phase 5) ---

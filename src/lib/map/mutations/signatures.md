@@ -13,7 +13,7 @@ Inserts an `ap_map_signature` row and emits `signature.create` with the full bod
 - `input.mapSystemId` — `ap_map_system.id` (the system the sig is in).
 - `input.mapConnectionId` — optional FK to the resolved wormhole connection.
 - `input.sigId` — in-game 3-char scan id (e.g. `"ABC"`).
-- `input.expiresAt` — when the sig ages out (set by the caller, typically now + 24 h).
+- `input.expiresAt` — when the sig ages out (set by the caller, typically `now + SIGNATURE_DEFAULT_TTL_MS`).
 - `input.tx` *(optional)* — outer Drizzle transaction (see `bulkSignatures.ts`). Forwarded to `commitMapEvent`.
 - remaining fields — `groupKey`, `classKind` (`signature`/`anomaly`, paste-derived), `typeId`, `name`, `description` (all optional).
 
