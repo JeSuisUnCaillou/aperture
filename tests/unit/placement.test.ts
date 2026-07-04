@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUTO_SLOT,
   GRID_SIZE,
+  MANUAL_SLOT,
+  NODE_HEIGHT,
+  NODE_WIDTH,
   SLOT_X,
   SLOT_Y,
   findOpenPosition,
@@ -31,6 +35,43 @@ describe('overlaps', () => {
   it('is false once either axis clears a full slot step', () => {
     expect(overlaps({ x: 0, y: 0 }, { x: SLOT_X, y: 0 })).toBe(false);
     expect(overlaps({ x: 0, y: 0 }, { x: 0, y: SLOT_Y })).toBe(false);
+  });
+});
+
+describe('manual-move slot decoupling', () => {
+  it('MANUAL_SLOT is tighter than AUTO_SLOT on both axes', () => {
+    expect(MANUAL_SLOT.x).toBeLessThan(AUTO_SLOT.x); // horizontal packs closer
+    expect(MANUAL_SLOT.y).toBeLessThan(AUTO_SLOT.y); // vertical packs closer
+    // SLOT_X/SLOT_Y remain the auto components.
+    expect({ x: SLOT_X, y: SLOT_Y }).toEqual(AUTO_SLOT);
+  });
+
+  it('every slot is grid-aligned and clears the node footprint (so drops never overlap)', () => {
+    for (const slot of [AUTO_SLOT, MANUAL_SLOT]) {
+      expect(slot.x % GRID_SIZE).toBe(0);
+      expect(slot.y % GRID_SIZE).toBe(0);
+      expect(slot.x).toBeGreaterThanOrEqual(NODE_WIDTH);
+      expect(slot.y).toBeGreaterThanOrEqual(NODE_HEIGHT);
+    }
+  });
+
+  it('overlaps at MANUAL_SLOT lets nodes pack closer than the auto gap', () => {
+    const a = { x: 0, y: 0 };
+    // Spacings the auto gap forbids but the tighter manual gap allows, per axis.
+    const closerX = { x: MANUAL_SLOT.x, y: 0 };
+    const closerY = { x: 0, y: MANUAL_SLOT.y };
+    expect(overlaps(a, closerX)).toBe(true); // auto (default) still collides
+    expect(overlaps(a, closerX, MANUAL_SLOT)).toBe(false); // manual clears
+    expect(overlaps(a, closerY)).toBe(true);
+    expect(overlaps(a, closerY, MANUAL_SLOT)).toBe(false);
+  });
+
+  it('findOpenPosition with MANUAL_SLOT nudges to the tighter edge', () => {
+    const blocker = { x: 0, y: 0 };
+    const drop = { x: MANUAL_SLOT.x - GRID_SIZE, y: 0 };
+    const pos = findOpenPosition(drop, [blocker], MANUAL_SLOT);
+    expect(pos).toEqual({ x: MANUAL_SLOT.x, y: 0 });
+    expect(overlaps(pos, blocker, MANUAL_SLOT)).toBe(false);
   });
 });
 

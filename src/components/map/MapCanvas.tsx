@@ -41,6 +41,7 @@ import type { SystemIntelSummary } from '@/lib/map/intel';
 import { applyEvent } from '@/lib/map/applyEvent';
 import {
   GRID_SIZE,
+  MANUAL_SLOT,
   findOpenPosition,
   overlaps,
   snapToGrid as snapPointToGrid,
@@ -974,8 +975,8 @@ export function MapCanvas({
       const existing = viewData.systems.find((s) => s.id === id);
       if (!node || !existing) continue;
       const snapped = snapPointToGrid(node.position);
-      const final = occupiedOthers.some((o) => overlaps(snapped, o))
-        ? findOpenPosition(snapped, occupiedOthers)
+      const final = occupiedOthers.some((o) => overlaps(snapped, o, MANUAL_SLOT))
+        ? findOpenPosition(snapped, occupiedOthers, MANUAL_SLOT)
         : snapped;
       if (existing.positionX === final.x && existing.positionY === final.y) continue;
       const patch: UpdateSystemBody = { positionX: final.x, positionY: final.y };
@@ -1045,8 +1046,8 @@ export function MapCanvas({
       const occupiedOthers: Point[] = viewData.systems
         .filter((s) => s.id !== node.id)
         .map((s) => ({ x: s.positionX, y: s.positionY }));
-      const final = occupiedOthers.some((o) => overlaps(snapped, o))
-        ? findOpenPosition(snapped, occupiedOthers)
+      const final = occupiedOthers.some((o) => overlaps(snapped, o, MANUAL_SLOT))
+        ? findOpenPosition(snapped, occupiedOthers, MANUAL_SLOT)
         : snapped;
       if (existing.positionX === final.x && existing.positionY === final.y) return;
       const patch: UpdateSystemBody = { positionX: final.x, positionY: final.y };
