@@ -17,5 +17,6 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d && pnpm db:
 - **Unknown bucket** — a null-character event becomes the `'0'` / `'(unknown)'` row.
 - **Scope visibility** — corp stats exclude another corp's map; outsider activity never leaks.
 - `hasNext` is false when anchored to the current period.
+- **Calendar-month split** — two events in one ISO week but different months (Jun 30 / Jul 1, 2026) land in their own month buckets under `period: 'month'`.
 
-Seeds two accounts (main+alt, outsider), three maps (private / own-corp / other-corp), inserts `ap_map_event` rows across the current and prior week, then `REFRESH MATERIALIZED VIEW ap_activity_rollup` before asserting.
+Seeds three accounts (main+alt, outsider, boundary), four maps (private / own-corp / other-corp / boundary-private), inserts `ap_map_event` rows across the current and prior week plus a month-straddling ISO week, then `REFRESH MATERIALIZED VIEW ap_activity_rollup` before asserting.

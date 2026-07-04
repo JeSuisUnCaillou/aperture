@@ -1,6 +1,6 @@
 ## activityRollupRefresh.ts
 
-**Purpose:** Hourly cron that runs `REFRESH MATERIALIZED VIEW CONCURRENTLY ap_activity_rollup` to update the weekly per-(character, map, kind) counter MV over `ap_map_event`.
+**Purpose:** Hourly cron that runs `REFRESH MATERIALIZED VIEW CONCURRENTLY ap_activity_rollup` to update the daily per-(character, map, kind) counter MV over `ap_map_event`.
 **File:** `src/lib/jobs/tasks/activityRollupRefresh.ts`
 
 ---

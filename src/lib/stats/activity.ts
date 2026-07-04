@@ -21,8 +21,10 @@ import { viewableMapPredicate } from '@/lib/auth/rights';
  *     and `system.moved` (the rollup's derived bucket for drag-only position
  *     updates) is not a contribution to the communal map. Both are filtered out
  *     (`kind NOT LIKE 'map.%' AND kind <> 'system.moved'`).
- *   - **week/month/year periods** are derived from the weekly rollup by mapping
- *     each ISO week to its Monday's calendar month/year (see period helpers).
+ *   - **week/month/year periods** are derived from the daily rollup by folding
+ *     each day into its calendar week/month/year bucket (see period helpers).
+ *     Calendar boundaries are exact — a week straddling a month contributes each
+ *     day to its own month.
  */
 
 export type ActivityStatScope = 'private' | 'corp' | 'alliance';
@@ -197,7 +199,7 @@ function bucketKey(date: Date, period: ActivityStatPeriod): string {
 
 type AggRow = {
   main_id: string;
-  week_monday: string;
+  day: string;
   kind: string;
   total: number;
 };
@@ -265,9 +267,9 @@ export async function loadActivityStats(input: {
     WITH agg AS (
       SELECT
         COALESCE(u.main_character_id, c.id, r.character_id)::text AS main_id,
-        to_date(r.iso_year || '-' || r.iso_week, 'IYYY-IW')        AS week_monday,
-        r.kind                                                     AS kind,
-        SUM(r.event_count)::int                                    AS total
+        r.day                                                     AS day,
+        r.kind                                                    AS kind,
+        SUM(r.event_count)::int                                   AS total
       FROM ap_activity_rollup r
       LEFT JOIN ap_character c ON c.id = r.character_id
       LEFT JOIN ap_user u ON u.id = c.user_id
@@ -276,10 +278,10 @@ export async function loadActivityStats(input: {
         AND r.kind <> 'system.moved'
       GROUP BY 1, 2, 3
     )
-    SELECT main_id, to_char(week_monday, 'YYYY-MM-DD') AS week_monday, kind, total
+    SELECT main_id, to_char(day, 'YYYY-MM-DD') AS day, kind, total
     FROM agg
-    WHERE week_monday >= ${toISODate(windowStart)}::date
-      AND week_monday <  ${toISODate(nextStart)}::date
+    WHERE day >= ${toISODate(windowStart)}::date
+      AND day <  ${toISODate(nextStart)}::date
   `);
 
   interface Acc {
@@ -293,7 +295,7 @@ export async function loadActivityStats(input: {
   const accById = new Map<string, Acc>();
 
   for (const row of result.rows) {
-    const idx = bucketIndex.get(bucketKey(new Date(`${row.week_monday}T00:00:00Z`), period));
+    const idx = bucketIndex.get(bucketKey(new Date(`${row.day}T00:00:00Z`), period));
     if (idx === undefined) continue;
     let acc = accById.get(row.main_id);
     if (!acc) {
