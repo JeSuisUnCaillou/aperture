@@ -664,7 +664,7 @@ function SignaturePanelBody({
               <tr
                 key={row.id}
                 className={cn(
-                  'border-t border-foreground/10 align-middle',
+                  'border-t border-foreground/10 align-middle even:bg-foreground/[0.03]',
                   row.original.id === flashSigId && 'ap-sig-flash',
                 )}
               >
