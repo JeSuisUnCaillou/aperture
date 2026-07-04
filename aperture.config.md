@@ -27,6 +27,7 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 - `INTEGRATION_REQUEST_TIMEOUT_MS`, `INTEGRATION_USER_AGENT` — shared timeout + UA for zKillboard / EVE-Scout / GitHub.
 - `ZKB_R2Z2_BASE`, `ZKB_FEED_POLL_MS` (≥6s hard floor), `ZKB_FEED_INDEX_REFRESH_MS`, `ZKB_FEED_MAX_CATCHUP` — zKillboard R2Z2 live-feed config.
 - `GITHUB_CHANGELOG_REPO`, `GITHUB_CHANGELOG_REVALIDATE_S` — GitHub releases changelog feed.
+- `KILLMAIL_CACHE_RETENTION_DAYS` (30), `KILLMAIL_CLEANUP_CRON` — retention window and daily sweep cadence for the `universe_killmail` cache reaper (`killmail-cleanup`).
 
 **Realtime / WebSocket**
 - `MAP_EVENT_NOTIFY_CHANNEL_PREFIX` — `pg_notify` channel prefix for `ap_map_event` fanout.
@@ -44,8 +45,9 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 - `AUTHZ_ADMIN_ROLE` — the ESI corporation role (`Director`) that resolves a character to `manager`.
 
 **Wormhole / signature lifetimes**
-- `WORMHOLE_EOL_LIFETIME_MS` (4h + 15% / 36m buffer), `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (1h + 15m), `WORMHOLE_DEFAULT_LIFETIME_MS` (48h) — drive the canvas countdowns and the reap-job purge thresholds.
-- `SIGNATURE_DEFAULT_TTL_MS` — default `expires_at` offset for new signatures (5 days).
+- `WORMHOLE_EOL_NOMINAL_MS` (4h), `WORMHOLE_EOL_CRITICAL_NOMINAL_MS` (1h) — in-game nominal EOL lifetimes; drive the displayed canvas countdown.
+- `WORMHOLE_EOL_LIFETIME_MS` (4h + 15% / 36m buffer), `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (1h + 15m) — nominal + grace-buffer reap-job purge thresholds. `WORMHOLE_DEFAULT_LIFETIME_MS` (48h) covers the non-EOL default.
+- `SIGNATURE_DEFAULT_TTL_MS` — default `expires_at` offset for new signatures (48 hours).
 
 **Job runtime / instrumentation**
 - `JOB_WORKER_CONCURRENCY`, `JOB_POLL_INTERVAL_MS` — graphile-worker concurrency and fallback poll cadence (LISTEN/NOTIFY drives the fast path).

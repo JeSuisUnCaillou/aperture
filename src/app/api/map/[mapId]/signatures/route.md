@@ -6,6 +6,6 @@
 ### POST
 Inserts an `ap_map_signature` row and emits `signature.create`. Returns `{ ok, data, eventId }` where `data` is the full signature body.
 
-**Body:** `{ mapSystemId: string, sigId: string, expiresAt: ISO datetime, mapConnectionId?: string | null, groupKey?, classKind?, typeId?, name?, description? }` — `mapSystemId` and `sigId` are required; `expiresAt` is a required ISO datetime string. `classKind` is `signature` | `anomaly` | null.
+**Body:** `{ mapSystemId: string, sigId: string, expiresAt: ISO datetime, mapConnectionId?: string | null, groupKey?, classKind?, typeId?, eolStage?, name?, description? }` — `mapSystemId` and `sigId` are required; `expiresAt` is a required ISO datetime string. `classKind` is `signature` | `anomaly` | null. `eolStage` is `none` | `eol` | `critical` (pre-jump EOL stage, wormhole sigs only).
 
 **Responses:** 200 ok, 400 mutation error / invalid ids, 401 unauthenticated, 404 map not found.

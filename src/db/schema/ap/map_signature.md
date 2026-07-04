@@ -14,6 +14,7 @@
 - `group_key` — `signature_group_key` enum, nullable. Scanner-level group (replaced `group_id`, migration 0015).
 - `class_kind` — `signature_class_kind` enum (`signature` | `anomaly`), nullable. Paste-derived from EVE's "Cosmic Signature" / "Cosmic Anomaly" Class column; null for legacy/manual rows. Added migration 0045.
 - `type_id` — `integer` FK → `universe_type.id` `ON DELETE SET NULL`.
+- `eol_stage` — `eol_stage` enum (`none`/`eol`/`critical`), default `none` (migration 0051). Pre-jump EOL stage for a wormhole sig; shares the connection's enum and is transferred onto `ap_map_connection.eol_stage` when the sig is bound to its connection. Only meaningful when `group_key = 'wormhole'`.
 - `name`, `description` — `text`, nullable.
 - `created_at` / `updated_at` — `timestamptz`, default `now()`.
 - `expires_at` — `timestamptz`, required. The signature-reap cron deletes rows where `expires_at < now()`.

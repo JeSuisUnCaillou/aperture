@@ -1,6 +1,6 @@
 ## activity.ts
 
-**Purpose:** Server-side reader that turns the `ap_activity_rollup` materialized view into the Statistics dialog's per-character, scope-filtered, period-bucketed activity table + sparkline series.
+**Purpose:** Server-side reader that turns the `ap_activity_rollup` daily materialized view into the Statistics dialog's per-character, scope-filtered, period-bucketed activity table + sparkline series.
 **File:** `src/lib/stats/activity.ts`
 
 ---
@@ -26,7 +26,7 @@ Per-character activity for `scope` over the period containing `anchor` (ISO `yyy
 
 - Resolves in-scope map ids via `viewableMapPredicate` (`src/lib/auth/rights.ts`) `AND type = scope AND deleted_at IS NULL`; admins (predicate `undefined`) filter by type only. No viewable maps → empty `rows`.
 - One raw `db.execute` over `ap_activity_rollup` for those maps, excluding non-contributions (`kind NOT LIKE 'map.%' AND kind <> 'system.moved'` — see the MV's `system.moved` re-bucketing of drag-only position updates), `LEFT JOIN ap_character → ap_user`. **Main-character attribution:** `COALESCE(main_character_id, character.id, rollup.character_id)`; `0` (erased) collapses to the `'0'` unknown bucket.
-- Each rollup row's ISO week → its Monday (`to_date(... ,'IYYY-IW')`); the Monday's bucket (week = itself, month = first-of-month, year = Jan-1) places it into one of 12 trailing buckets. The **current** (last) bucket fills the triplet columns + `total`; **all** buckets fill `series`.
+- Each rollup row's `day` is folded into its bucket (week = Monday of its ISO week, month = first-of-month, year = Jan-1), one of 12 trailing buckets — so calendar month/year boundaries are exact. The **current** (last) bucket fills the triplet columns + `total`; **all** buckets fill `series`.
 - Display names resolved in one `inArray` query; `'0'` → `'(unknown)'`. Portraits via `images.evetech.net`.
 - Rows sorted by current-period `total` desc, tie-broken by trailing series sum.
 

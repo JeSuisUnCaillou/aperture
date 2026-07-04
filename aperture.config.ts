@@ -61,6 +61,20 @@ export const apertureConfig = {
    */
   ZKB_FEED_MAX_CATCHUP: 200,
 
+  /**
+   * Retention for the `universe_killmail` cache, in days. Killmail relevance
+   * decays and zKillboard only surfaces recent kills, so the `killmail-cleanup`
+   * reaper deletes rows whose `killmail_time` is older than this.
+   */
+  KILLMAIL_CACHE_RETENTION_DAYS: 30,
+
+  /**
+   * `killmail-cleanup` cron cadence. Age-by-kill-time retention is not
+   * time-critical, so a daily sweep well outside the 11:00 EVE downtime window
+   * suffices.
+   */
+  KILLMAIL_CLEANUP_CRON: '20 4 * * *',
+
   /** Repository slug used by the changelog integration. Must match the `origin` remote. */
   GITHUB_CHANGELOG_REPO: 'KitchenSinkhole/aperture',
 
@@ -223,18 +237,32 @@ export const apertureConfig = {
   AUTHZ_ADMIN_ROLE: 'Director',
 
   /**
-   * How long a wormhole connection has left from the moment it goes EOL to the
-   * point a reap job would purge it: 4h nominal + 15% (36 minutes) safety buffer. Read by the
-   * EOL-expiry job and surfaced as a countdown on EOL-flagged edges.
+   * In-game nominal lifetime of an `eol`-stage wormhole from the moment it goes
+   * EOL: 4h. Drives the displayed countdown on EOL-flagged edges; the reap job
+   * adds a grace buffer on top (`WORMHOLE_EOL_LIFETIME_MS`).
+   */
+  WORMHOLE_EOL_NOMINAL_MS: 14_400_000,
+
+  /**
+   * In-game nominal lifetime of a `critical`-stage wormhole from the moment it
+   * enters the ~1h stage: 1h. Drives the displayed countdown; the reap job adds
+   * a grace buffer on top (`WORMHOLE_EOL_CRITICAL_LIFETIME_MS`).
+   */
+  WORMHOLE_EOL_CRITICAL_NOMINAL_MS: 3_600_000,
+
+  /**
+   * Reap threshold for an `eol`-stage wormhole: the 4h nominal
+   * (`WORMHOLE_EOL_NOMINAL_MS`) plus a 15% (36 minute) grace buffer = 4h36m.
+   * Read by the EOL-expiry job to decide when to purge the row. The grace buffer
+   * is internal: the displayed countdown runs to the nominal, not to this.
    */
   WORMHOLE_EOL_LIFETIME_MS: 16_560_000,
 
   /**
-   * How long a wormhole connection has left from the moment it enters the
-   * *critical* (1h) EOL stage to the point the reap job purges it. Mirrors
-   * `WORMHOLE_EOL_LIFETIME_MS`'s 15-minute safety buffer beyond the in-game
-   * nominal: 1h + 15m = 4_500_000 ms. The newer of EVE's two EOL warnings
-   * ("~1h left") selects this constant over the 4h `WORMHOLE_EOL_LIFETIME_MS`.
+   * Reap threshold for a `critical`-stage wormhole: the 1h nominal
+   * (`WORMHOLE_EOL_CRITICAL_NOMINAL_MS`) plus a 15-minute grace buffer = 1h15m.
+   * The newer of EVE's two EOL warnings ("~1h left") selects this over the 4h36m
+   * `WORMHOLE_EOL_LIFETIME_MS`.
    */
   WORMHOLE_EOL_CRITICAL_LIFETIME_MS: 4_500_000,
 
@@ -247,9 +275,10 @@ export const apertureConfig = {
 
   /**
    * Default TTL applied to a newly created signature (`expires_at = created_at +
-   * this`): 5 days.
+   * this`): 48 hours — the maximum a wormhole can stay open in EVE, so a sig
+   * nobody has re-scanned in that long is presumed gone.
    */
-  SIGNATURE_DEFAULT_TTL_MS: 259_200_000,
+  SIGNATURE_DEFAULT_TTL_MS: 172_800_000,
 
   /**
    * graphile-worker concurrency: how many task handlers may run in parallel in
@@ -276,6 +305,14 @@ export const apertureConfig = {
    * `ap_map_event` or job logs.
    */
   JOB_INSTRUMENTATION_NOTES_MAX_BYTES: 8_000,
+
+  /**
+   * 1-in-N success sampling for high-frequency `ap_job_run` writers (location-poll
+   * is ~98% of all rows). Every failure is still persisted; a sampled success row
+   * carries `weight = N` so the admin job-success chart scales the sample back up.
+   * N = 1 disables sampling (every success persisted).
+   */
+  JOB_INSTRUMENTATION_SUCCESS_SAMPLE: 50,
 
   /**
    * Maps soft-deleted (`ap_map.deleted_at IS NOT NULL`) more than this many

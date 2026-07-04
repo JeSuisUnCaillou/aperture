@@ -24,7 +24,7 @@ A small dismissible `Card` pinned to the canvas top-left (`absolute left-2 top-2
 - Dedupes by `from→to` EVE-system key, so a fleet jumping the same hole shows one prompt.
 - On open, loads the `typeId → targetClass` and `typeId → jumpMassClass` maps via `fetchWormholeCatalog` (system-independent catalog facts; shared session-wide cache, usually warm) — the first filters candidates, the second drives the connection-size auto-set.
 - Candidates (pure `transitCandidates` helper): source-system `wormhole` sigs **not already bound to any connection**, whose type's `targetClass` matches the destination class, or whose type leads anywhere (K162 / `targetClass == null`), or which have no type set (`typeId == null`).
-- Clicking a candidate calls `onPatchSignature(sig.id, { mapConnectionId })`, then — when the sig already carries a type with an inferable band — `onConnectionPatch(connectionId, { jumpMassClass })` (e.g. B274 → M), then dismisses. Never sets the sig's `typeId` — destination class alone can't identify the exact WH code.
+- Clicking a candidate calls `onPatchSignature(sig.id, { mapConnectionId })`, then — when the sig already carries a type with an inferable band — `onConnectionPatch(connectionId, { jumpMassClass })` (e.g. B274 → M), then — when the sig carries a non-`none` EOL stage (`sig.eolStage`) — `onConnectionPatch(connectionId, { eolStage: sig.eolStage })`, then dismisses. Never sets the sig's `typeId` — destination class alone can't identify the exact WH code.
 - Filaments and unscanned sources yield zero candidates ⇒ nothing renders.
 
 ### Emits / Calls

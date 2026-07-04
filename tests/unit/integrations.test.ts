@@ -5,7 +5,7 @@ import { fetchChangelogReleases, githubReleasesSchema } from '@/lib/integrations
 import {
   anoikSystemUrl,
   ccpImageUrl,
-  dotlanSystemUrl,
+  dotlanMapUrl,
   eveeyeSystemUrl,
   zkillboardSystemUrl,
 } from '@/lib/integrations/links';
@@ -102,8 +102,10 @@ describe('Stage 13 decoders', () => {
 
 describe('Stage 13 link helpers', () => {
   it('builds external links', () => {
-    expect(dotlanSystemUrl('Jita')).toBe('https://evemaps.dotlan.net/system/Jita');
-    expect(dotlanSystemUrl('Amarr VIII')).toBe('https://evemaps.dotlan.net/system/Amarr_VIII');
+    expect(dotlanMapUrl('The Forge', 'Jita')).toBe('https://evemaps.dotlan.net/map/The_Forge/Jita');
+    expect(dotlanMapUrl('Domain', 'Amarr VIII')).toBe(
+      'https://evemaps.dotlan.net/map/Domain/Amarr_VIII',
+    );
     expect(eveeyeSystemUrl(30000142)).toBe('https://eveeye.com/?system=30000142');
     expect(anoikSystemUrl('J123456')).toBe('https://anoik.is/systems/J123456');
     expect(zkillboardSystemUrl(30000142)).toBe('https://zkillboard.com/system/30000142/');

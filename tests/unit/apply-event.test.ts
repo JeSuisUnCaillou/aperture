@@ -33,6 +33,8 @@ const sys1: MapSystemNode = {
   staticTypeIds: [],
   tradeHub: null,
   locked: false,
+  lockedByCharacterId: null,
+  lockedByName: null,
   rallyAt: null,
   positionX: 100,
   positionY: 200,
@@ -89,6 +91,7 @@ describe('applyEvent — system.added', () => {
       groupKey: null,
       classKind: null,
       typeId: null,
+      eolStage: 'none',
       wormholeCode: null,
       name: null,
       description: null,
@@ -134,8 +137,34 @@ describe('applyEvent — system.updated', () => {
       id: '10',
       status: 'hostile',
       locked: true,
+      lockedByCharacterId: 95465499,
+      lockedByName: 'CCP Falcon',
     });
-    expect(next.systems[0]).toMatchObject({ status: 'hostile', locked: true, name: 'Jita' });
+    expect(next.systems[0]).toMatchObject({
+      status: 'hostile',
+      locked: true,
+      lockedByCharacterId: 95465499,
+      lockedByName: 'CCP Falcon',
+      name: 'Jita',
+    });
+  });
+
+  it('clears lock attribution on unlock', () => {
+    const locked = { ...sys1, locked: true, lockedByCharacterId: 1, lockedByName: 'Pilot' };
+    const state = makeState({ systems: [locked] });
+    const next = applyEvent(state, {
+      kind: 'system.updated',
+      eventId: 7,
+      id: '10',
+      locked: false,
+      lockedByCharacterId: null,
+      lockedByName: null,
+    });
+    expect(next.systems[0]).toMatchObject({
+      locked: false,
+      lockedByCharacterId: null,
+      lockedByName: null,
+    });
   });
 
   it('updates position fields', () => {
@@ -282,6 +311,7 @@ const sig1: MapSignature = {
   groupKey: null,
   classKind: null,
   typeId: null,
+  eolStage: 'none',
   wormholeCode: null,
   name: null,
   description: null,

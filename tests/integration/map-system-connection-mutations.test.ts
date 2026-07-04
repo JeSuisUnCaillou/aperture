@@ -114,9 +114,13 @@ describe.skipIf(!run)('system & connection mutations (real Postgres)', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(() => mapEventPayloadSchema.parse(result.data)).not.toThrow();
-    // `statics` carries far-side target-class labels (systemNode resolves
-    // targetClass ?? code); X877 leads to hi-sec, so the class is 'H'.
-    expect(result.data).toMatchObject({ kind: 'system.added', systemId: C3, statics: ['H'] });
+    // `statics` pairs each far-side target-class label with its WH type-id
+    // (systemNode resolves targetClass ?? code); X877 leads to hi-sec, class 'H'.
+    expect(result.data).toMatchObject({
+      kind: 'system.added',
+      systemId: C3,
+      statics: [{ label: 'H', typeId: WH_C3_HS }],
+    });
     expect(await eventCount()).toBe(before + 1);
 
     const [row] = await db
@@ -144,6 +148,9 @@ describe.skipIf(!run)('system & connection mutations (real Postgres)', () => {
       status: 'hostile',
       alias: 'Home',
       locked: true,
+      // The lock holder rides whenever `locked` changes; the actor is null here.
+      lockedByCharacterId: null,
+      lockedByName: null,
     });
 
     const [row] = await db
@@ -155,6 +162,11 @@ describe.skipIf(!run)('system & connection mutations (real Postgres)', () => {
 
   it('removeSystem flips visible=false (row persists) then re-add preserves intel', async () => {
     const sysId = await mapSystemId(C3);
+
+    // The prior test locked C3; the #157 guard blocks removing a locked system,
+    // so unlock it first. A re-add preserves the locked flag, so this keeps C3
+    // unlocked for the remaining removal tests too.
+    await updateSystem({ mapId, mapSystemId: sysId, characterId: null, patch: { locked: false } });
 
     const removed = await removeSystem({ mapId, mapSystemId: sysId, characterId: null });
     expect(removed.ok).toBe(true);

@@ -14,6 +14,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { WormholeTypeSelect } from './WormholeTypeSelect';
 import { SignatureGroupSelect } from './SignatureGroupSelect';
 import { ConnectionSelect } from './ConnectionSelect';
@@ -33,10 +40,15 @@ import type {
   UpdateConnectionBody,
   UpdateSignatureBody,
 } from '@/lib/map/client';
-import type { WhJumpMass } from '@/lib/map/enumLabels';
+import {
+  EOL_STAGES,
+  EOL_STAGE_LABELS,
+  type EolStage,
+  type WhJumpMass,
+} from '@/lib/map/enumLabels';
 import { fetchWormholeCatalog } from '@/lib/map/client';
 import { SIGNATURE_GROUP_CATALOG } from '@/lib/map/signatureGroups';
-import { formatAgoFromMs, formatRelativeFromMs } from '@/lib/map/relativeTime';
+import { formatAgoFromMs } from '@/lib/map/relativeTime';
 import { cn } from '@/lib/utils';
 import { apertureConfig } from '../../../aperture.config';
 
@@ -72,7 +84,7 @@ function loadPersistedFilter(): PersistedFilter {
  * the inner select trigger or text input by their `data-slot`.
  */
 const MISSING_CELL =
-  '[&_[data-slot=select-trigger]]:border-destructive [&_[data-slot=input]]:border-destructive';
+  '[&_[data-slot=select-trigger]]:border-2 [&_[data-slot=select-trigger]]:border-destructive/50 [&_[data-slot=input]]:border-2 [&_[data-slot=input]]:border-destructive/50';
 
 /**
  * Strips the "pill" affordance off an in-table select trigger / text input so a
@@ -95,7 +107,7 @@ const colHeaderClass: Record<string, string> = {
   type: 'w-56 px-3 py-0.5 text-left',
   description: 'px-3 py-0.5 text-left',
   leadsTo: 'w-44 px-3 py-0.5 text-left',
-  ttl: 'w-16 px-1 py-0.5 text-left',
+  eol: 'w-20 px-3 py-0.5 text-left',
   createdAt: 'w-24 px-1 py-0.5 text-left',
   updatedAt: 'w-24 px-1 py-0.5 text-left',
   actions: 'w-10 px-1 py-0.5',
@@ -114,12 +126,6 @@ function buildGroupChangePatch(
 
 function defaultExpiry(): string {
   return new Date(Date.now() + apertureConfig.SIGNATURE_DEFAULT_TTL_MS).toISOString();
-}
-
-function formatRelativeIso(iso: string): string {
-  const ts = new Date(iso).getTime();
-  if (Number.isNaN(ts)) return iso;
-  return formatRelativeFromMs(ts - Date.now());
 }
 
 function formatAgoIso(iso: string): string {
@@ -176,7 +182,9 @@ type SignatureTableMeta = {
   systems: MapSystemNode[];
   onPatch: (signatureId: string, patch: UpdateSignatureBody) => void;
   onDelete: (signatureId: string) => void;
+  onConnectionPatch: (connectionId: string, patch: UpdateConnectionBody) => void;
   syncConnectionSize: (typeId: number | null, connectionId: string | null) => void;
+  syncConnectionEol: (stage: EolStage, connectionId: string | null) => void;
   metaByTypeId: Map<number, WormholeTypeMeta>;
   assignedConnectionIds: string[];
 };
@@ -270,10 +278,12 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
     systems,
     onPatch,
     syncConnectionSize,
+    syncConnectionEol,
     metaByTypeId,
     assignedConnectionIds,
   } = table.options.meta as SignatureTableMeta;
-  const leadsToMissing = sig.groupKey === 'wormhole' && sig.mapConnectionId === null;
+  if (sig.groupKey !== 'wormhole') return null;
+  const leadsToMissing = sig.mapConnectionId === null;
   return (
     <div className={`px-1 py-px${leadsToMissing ? ` ${MISSING_CELL}` : ''}`}>
       <ConnectionSelect
@@ -284,8 +294,9 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
         onValueChange={(next) => {
           onPatch(sig.id, { mapConnectionId: next });
           syncConnectionSize(sig.typeId, next);
+          // Populate: carry the pre-jump EOL stage onto the connection.
+          syncConnectionEol(sig.eolStage, next);
         }}
-        disabled={sig.groupKey !== 'wormhole'}
         targetClass={
           sig.typeId == null ? null : metaByTypeId.get(sig.typeId)?.targetClass ?? null
         }
@@ -296,11 +307,79 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
   );
 }
 
-function TtlCell({ row }: CellContext<MapSignature, unknown>) {
+// EOL-stage picker (none / eol / critical), the same three-stage control the
+// connection offers in its right-click menu. For a wormhole sig linked to a
+// connection the connection's `eolStage` is authoritative (so the stage shows in
+// and edits from both places); before a connection exists the sig carries the
+// stage in `eolStage`, transferred onto the connection on populate. Renders an
+// empty cell for non-wormhole sigs, mirroring the "Leads to" cell.
+function EolCell({ row, table }: CellContext<MapSignature, unknown>) {
+  const sig = row.original;
+  const { connections, onPatch, onConnectionPatch } =
+    table.options.meta as SignatureTableMeta;
+  if (sig.groupKey !== 'wormhole') return null;
+  const linkedConn =
+    sig.mapConnectionId != null
+      ? connections.find((c) => c.id === sig.mapConnectionId) ?? null
+      : null;
+  const stage = linkedConn ? linkedConn.eolStage : sig.eolStage;
   return (
-    <span className="px-1 py-px text-xs text-muted-foreground">
-      {formatRelativeIso(row.original.expiresAt)}
-    </span>
+    <div className="px-1 py-px">
+      <EolStageSelect
+        value={stage}
+        onValueChange={(next) => {
+          if (linkedConn) onConnectionPatch(linkedConn.id, { eolStage: next });
+          else onPatch(sig.id, { eolStage: next });
+        }}
+        triggerClassName={FLAT_TRIGGER}
+      />
+    </div>
+  );
+}
+
+// Terse trigger labels (the descriptive `EOL_STAGE_LABELS` wrap in the narrow
+// column when the select is closed); the dropdown keeps the full labels.
+const EOL_STAGE_SHORT_LABELS: Record<EolStage, string> = {
+  none: 'None',
+  eol: '4h',
+  critical: '1h',
+};
+
+// The three EOL stages share the connection's `EOL_STAGE_LABELS` in the dropdown.
+// `eol`/`critical` tint amber so a live hole stands out; `none` reads as muted
+// static text.
+function EolStageSelect({
+  value,
+  onValueChange,
+  triggerClassName,
+}: {
+  value: EolStage;
+  onValueChange: (next: EolStage) => void;
+  triggerClassName?: string;
+}) {
+  return (
+    <Select<EolStage>
+      value={value}
+      onValueChange={(next) => next && onValueChange(next)}
+      items={EOL_STAGE_SHORT_LABELS}
+    >
+      <SelectTrigger
+        className={cn(
+          value !== 'none' && 'text-amber-600 dark:text-amber-300',
+          triggerClassName,
+        )}
+        aria-label="Wormhole EOL stage"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="p-0.5">
+        {EOL_STAGES.map((s) => (
+          <SelectItem className="py-1" key={s} value={s}>
+            {EOL_STAGE_LABELS[s]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -344,7 +423,7 @@ const signatureColumns = [
   columnHelper.display({ id: 'type', header: 'Type', cell: TypeColumnCell }),
   columnHelper.display({ id: 'description', header: 'Description', cell: DescriptionCell }),
   columnHelper.display({ id: 'leadsTo', header: 'Leads to', cell: LeadsToCell }),
-  columnHelper.display({ id: 'ttl', header: 'TTL', cell: TtlCell }),
+  columnHelper.display({ id: 'eol', header: 'EOL', cell: EolCell }),
   columnHelper.accessor('createdAt', { header: 'Created', enableSorting: true, cell: CreatedCell }),
   columnHelper.accessor('updatedAt', { header: 'Updated', enableSorting: true, cell: UpdatedCell }),
   columnHelper.display({ id: 'actions', header: '', cell: ActionsCell }),
@@ -403,10 +482,10 @@ export function SignatureModule({
 
 /**
  * Header actions for the Signatures panel — the **Lazy delete** arm toggle and
- * the **Paste from scanner** button. Rendered into the `MapPanel` header
- * (`headerRight`) rather than inside the card, so they sit beside the panel
- * title alongside the drag handle and hide button. Both are only shown when a
- * system is selected.
+ * the **Paste from scanner** button. Rendered into the `MapPanelGroup` header
+ * (`renderHeaderRight` for the active tab) rather than inside the card, so they
+ * sit beside the panel title alongside the drag handle and hide button. Both are
+ * only shown when a system is selected.
  */
 export function SignatureModuleHeaderActions({
   mapId,
@@ -546,6 +625,15 @@ function SignaturePanelBody({
     [rows],
   );
 
+  const sigStats = useMemo(
+    () => ({
+      total: rows.length,
+      unscanned: rows.filter((s) => s.classKind !== 'anomaly' && !isFullyScanned(s)).length,
+      wormholes: rows.filter((s) => s.groupKey === 'wormhole').length,
+    }),
+    [rows],
+  );
+
   const [persistedFilter] = useState(loadPersistedFilter);
   const [groupFilter, setGroupFilter] = useState<Set<SignatureGroupKey | null>>(
     () => new Set(persistedFilter.groups),
@@ -587,6 +675,20 @@ function SignaturePanelBody({
     [metaByTypeId, onConnectionPatch],
   );
 
+  /**
+   * When a WH sig with an EOL stage set is linked to its connection, carry that
+   * stage onto the connection — the connection is then authoritative. Only
+   * applies a non-`none` stage; a `none` sig leaves the connection's EOL alone so
+   * a stage set from the connection itself isn't cleared on link.
+   */
+  const syncConnectionEol = useCallback(
+    (stage: EolStage, connectionId: string | null) => {
+      if (stage === 'none' || connectionId == null) return;
+      onConnectionPatch(connectionId, { eolStage: stage });
+    },
+    [onConnectionPatch],
+  );
+
   const [sorting, setSorting] = useState<SortingState>([{ id: 'sigId', desc: false }]);
 
   const table = useReactTable({
@@ -603,7 +705,9 @@ function SignaturePanelBody({
       systems,
       onPatch,
       onDelete,
+      onConnectionPatch,
       syncConnectionSize,
+      syncConnectionEol,
       metaByTypeId,
       assignedConnectionIds,
     } satisfies SignatureTableMeta,
@@ -614,6 +718,7 @@ function SignaturePanelBody({
   const [draftName, setDraftName] = useState('');
   const [draftTypeId, setDraftTypeId] = useState<number | null>(null);
   const [draftConnectionId, setDraftConnectionId] = useState<string | null>(null);
+  const [draftEolStage, setDraftEolStage] = useState<EolStage>('none');
 
   function submit() {
     if (draftSigId.trim().length === 0) return;
@@ -623,16 +728,21 @@ function SignaturePanelBody({
       sigId: draftSigId.trim().toUpperCase(),
       groupKey: draftGroupKey,
       typeId: isWh ? draftTypeId : null,
+      eolStage: isWh ? draftEolStage : 'none',
       name: isWh ? null : (draftName.trim() || null),
       mapConnectionId: isWh ? draftConnectionId : null,
       expiresAt: defaultExpiry(),
     });
-    if (isWh) syncConnectionSize(draftTypeId, draftConnectionId);
+    if (isWh) {
+      syncConnectionSize(draftTypeId, draftConnectionId);
+      syncConnectionEol(draftEolStage, draftConnectionId);
+    }
     setDraftSigId('');
     setDraftGroupKey(null);
     setDraftName('');
     setDraftTypeId(null);
     setDraftConnectionId(null);
+    setDraftEolStage('none');
   }
 
   return (
@@ -642,6 +752,7 @@ function SignaturePanelBody({
         onGroupFilterChange={setGroupFilter}
         scanFilter={scanFilter}
         onScanFilterChange={setScanFilter}
+        stats={sigStats}
       />
       <div className="min-h-0 flex-1 overflow-y-auto rounded-md ring-1 ring-foreground/10">
         <table className="w-full text-sm [&_[data-slot=input]]:h-6 [&_[data-slot=select-trigger]]:h-6">
@@ -671,7 +782,7 @@ function SignaturePanelBody({
           <tbody>
             {table.getRowModel().rows.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-2 py-3 text-center text-xs text-muted-foreground">
+                <td colSpan={11} className="px-2 py-3 text-center text-xs text-muted-foreground">
                   {rows.length > 0 ? 'No signatures match the filter.' : 'No signatures.'}
                 </td>
               </tr>
@@ -680,7 +791,7 @@ function SignaturePanelBody({
               <tr
                 key={row.id}
                 className={cn(
-                  'border-t border-foreground/10 align-middle',
+                  'border-t border-foreground/10 align-middle even:bg-foreground/[0.03]',
                   row.original.id === flashSigId && 'ap-sig-flash',
                 )}
               >
@@ -716,6 +827,7 @@ function SignaturePanelBody({
               setDraftTypeId(null);
               setDraftName('');
               setDraftConnectionId(null);
+              setDraftEolStage('none');
             }}
           />
         </div>
@@ -753,6 +865,12 @@ function SignaturePanelBody({
               }
               excludeIds={assignedConnectionIds}
             />
+          </div>
+        )}
+        {draftGroupKey === 'wormhole' && (
+          <div className="flex w-24 flex-col gap-1">
+            <span className="text-[11px] text-muted-foreground">EOL</span>
+            <EolStageSelect value={draftEolStage} onValueChange={setDraftEolStage} />
           </div>
         )}
         <Button type="button" onClick={submit} disabled={draftSigId.trim().length === 0}>
@@ -832,11 +950,13 @@ function SignatureFilterBar({
   onGroupFilterChange,
   scanFilter,
   onScanFilterChange,
+  stats,
 }: {
   groupFilter: Set<SignatureGroupKey | null>;
   onGroupFilterChange: (next: Set<SignatureGroupKey | null>) => void;
   scanFilter: ScanFilter;
   onScanFilterChange: (next: ScanFilter) => void;
+  stats: { total: number; unscanned: number; wormholes: number };
 }) {
   function toggleGroup(key: SignatureGroupKey | null) {
     const next = new Set(groupFilter);
@@ -879,15 +999,28 @@ function SignatureFilterBar({
           Unknown
         </FilterToggle>
       </div>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className={cn('h-6 px-2 text-xs', scanStyle[scanFilter].className)}
-        onClick={cycleScanFilter}
-      >
-        {scanStyle[scanFilter].label}
-      </Button>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">
+          {stats.total} signature{stats.total === 1 ? '' : 's'}
+          <span className="mx-1.5 opacity-40">·</span>
+          {stats.unscanned} unscanned
+          {stats.wormholes > 0 && (
+            <>
+              <span className="mx-1.5 opacity-40">·</span>
+              {stats.wormholes} wormhole{stats.wormholes === 1 ? '' : 's'}
+            </>
+          )}
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className={cn('h-6 px-2 text-xs', scanStyle[scanFilter].className)}
+          onClick={cycleScanFilter}
+        >
+          {scanStyle[scanFilter].label}
+        </Button>
+      </div>
     </div>
   );
 }

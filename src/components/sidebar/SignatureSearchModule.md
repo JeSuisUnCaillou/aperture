@@ -14,7 +14,7 @@
 | onNavigate | (systemId: string, sigId: string) => void | yes | Called when a result's "Go" is clicked — selects/centers the system and flashes the row |
 
 ### Renders
-A single frameless `Card` (panel body) with a filter bar (name, group, max-age, type toggles, system-class toggles) above a scrollable, sortable results table (Group, Sig, System, Name, Age, Go) and a result-count line. Empty-state row when no signatures match.
+A single frameless `Card` (panel body) with a filter bar (name, group, max-age, type toggles, system-class toggles) above a scrollable, sortable results table (Group, Sig, System, Name, Age, Go) and a result-count line. Empty-state row when no signatures match. Body rows are zebra-striped (even rows tinted) with a hover highlight that takes over on the pointed row.
 
 ### Behaviour & Interactions
 - Name input is debounced 150ms before firing `onFiltersChange`; a `filtersRef` (synced via `useLayoutEffect`) keeps the debounce callback from clobbering concurrent non-name filter edits.

@@ -26,21 +26,31 @@ const ALLIANCE_MAIN = 99500901n;
 const MAIN_ID = 99501001n;
 const ALT_ID = 99501002n;
 const OUTSIDER_ID = 99501003n;
+const BOUNDARY_ID = 99501004n;
 
-const characterIds = [MAIN_ID, ALT_ID, OUTSIDER_ID];
+const characterIds = [MAIN_ID, ALT_ID, OUTSIDER_ID, BOUNDARY_ID];
 
 const PRIVATE_MAP = 'Stats Private Map';
 const CORP_MAP = 'Stats Corp Map';
 const OTHER_MAP = 'Stats Other-Corp Map';
+const BOUNDARY_MAP = 'Stats Boundary Map';
 
 let userId = 0;
 let outsiderUserId = 0;
+let boundaryUserId = 0;
 let privateMapId = 0n;
 let corpMapId = 0n;
 let otherMapId = 0n;
+let boundaryMapId = 0n;
 
 const NOW = new Date();
 const LAST_WEEK = new Date(NOW.getTime() - 7 * 86400000);
+
+// Two adjacent days in the *same* ISO week (week 27 of 2026, Monday = 2026-06-29)
+// but different calendar months. The old ISO-week rollup filed both under June;
+// the daily rollup must split them by calendar month.
+const JUN_30 = new Date('2026-06-30T12:00:00Z');
+const JUL_01 = new Date('2026-07-01T12:00:00Z');
 
 function session(characterId: bigint): Session {
   return { characterId: characterId.toString(), expires: '' } as unknown as Session;
@@ -72,14 +82,21 @@ describe.skipIf(!run)('Stage 17.7 — activity statistics (real Postgres)', () =
     userId = u!.id;
     const [ou] = await db.insert(apUser).values({}).returning({ id: apUser.id });
     outsiderUserId = ou!.id;
+    const [bu] = await db.insert(apUser).values({}).returning({ id: apUser.id });
+    boundaryUserId = bu!.id;
 
     await db.insert(apCharacter).values([
       mkChar(MAIN_ID, 'Main Pilot', userId, CORP_MAIN, ALLIANCE_MAIN),
       mkChar(ALT_ID, 'Alt Pilot', userId, CORP_MAIN, ALLIANCE_MAIN),
       mkChar(OUTSIDER_ID, 'Outsider', outsiderUserId, CORP_OTHER, null),
+      mkChar(BOUNDARY_ID, 'Boundary Pilot', boundaryUserId, CORP_OTHER, null),
     ]);
     // Main is the account's main; the alt's activity must roll up to it.
     await db.update(apUser).set({ mainCharacterId: MAIN_ID }).where(eq(apUser.id, userId));
+    await db
+      .update(apUser)
+      .set({ mainCharacterId: BOUNDARY_ID })
+      .where(eq(apUser.id, boundaryUserId));
 
     const inserted = await db
       .insert(apMap)
@@ -87,11 +104,13 @@ describe.skipIf(!run)('Stage 17.7 — activity statistics (real Postgres)', () =
         { name: PRIVATE_MAP, scope: 'wh', type: 'private', ownerCharacterId: MAIN_ID },
         { name: CORP_MAP, scope: 'all', type: 'corp', ownerCorporationId: CORP_MAIN },
         { name: OTHER_MAP, scope: 'all', type: 'corp', ownerCorporationId: CORP_OTHER },
+        { name: BOUNDARY_MAP, scope: 'wh', type: 'private', ownerCharacterId: BOUNDARY_ID },
       ])
       .returning({ id: apMap.id, name: apMap.name });
     privateMapId = inserted.find((m) => m.name === PRIVATE_MAP)!.id;
     corpMapId = inserted.find((m) => m.name === CORP_MAP)!.id;
     otherMapId = inserted.find((m) => m.name === OTHER_MAP)!.id;
+    boundaryMapId = inserted.find((m) => m.name === BOUNDARY_MAP)!.id;
 
     await db.insert(apMapEvent).values([
       // Private map, current week.
@@ -121,6 +140,9 @@ describe.skipIf(!run)('Stage 17.7 — activity statistics (real Postgres)', () =
       ...events(corpMapId, MAIN_ID, 'connection.update', 3, NOW),
       // Other-corp map — main cannot view; must never appear.
       ...events(otherMapId, OUTSIDER_ID, 'system.added', 5, NOW),
+      // Boundary map — a month-straddling ISO week split across two months.
+      ...events(boundaryMapId, BOUNDARY_ID, 'system.added', 3, JUN_30),
+      ...events(boundaryMapId, BOUNDARY_ID, 'system.added', 2, JUL_01),
     ]);
 
     await db.execute(sql`REFRESH MATERIALIZED VIEW "ap_activity_rollup"`);
@@ -194,6 +216,24 @@ describe.skipIf(!run)('Stage 17.7 — activity statistics (real Postgres)', () =
     const stats = await loadActivityStats({ session: session(MAIN_ID), scope: 'private', period: 'week' });
     expect(stats.hasNext).toBe(false);
   });
+
+  it('splits a month-straddling ISO week by calendar month', async () => {
+    // Week 27 of 2026 spans Jun 29–Jul 5. In month view, Jun 30 must land in
+    // June and Jul 1 in July — not both in June (the ISO-week-grain bug).
+    const stats = await loadActivityStats({
+      session: session(BOUNDARY_ID),
+      scope: 'private',
+      period: 'month',
+      anchor: '2026-07-15',
+    });
+    const main = stats.rows.find((r) => r.mainCharacterId === BOUNDARY_ID.toString())!;
+    expect(main).toBeDefined();
+    // Anchor is mid-July → current bucket is July (index 11), June is index 10.
+    expect(main.series.at(-1)).toBe(2); // July: the Jul 1 events
+    expect(main.series.at(-2)).toBe(3); // June: the Jun 30 events
+    expect(main.system.create).toBe(2); // current-month triplet = July only
+    expect(main.total).toBe(2);
+  });
 });
 
 function mkChar(
@@ -216,7 +256,9 @@ function mkChar(
 }
 
 async function cleanup() {
-  await db.delete(apMap).where(sql`name IN (${PRIVATE_MAP}, ${CORP_MAP}, ${OTHER_MAP})`);
+  await db
+    .delete(apMap)
+    .where(sql`name IN (${PRIVATE_MAP}, ${CORP_MAP}, ${OTHER_MAP}, ${BOUNDARY_MAP})`);
   await db.delete(apCharacter).where(inArray(apCharacter.id, characterIds));
   if (userId) {
     await db.delete(apUser).where(eq(apUser.id, userId));
@@ -226,7 +268,12 @@ async function cleanup() {
     await db.delete(apUser).where(eq(apUser.id, outsiderUserId));
     outsiderUserId = 0;
   }
+  if (boundaryUserId) {
+    await db.delete(apUser).where(eq(apUser.id, boundaryUserId));
+    boundaryUserId = 0;
+  }
   privateMapId = 0n;
   corpMapId = 0n;
   otherMapId = 0n;
+  boundaryMapId = 0n;
 }

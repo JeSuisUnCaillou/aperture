@@ -330,6 +330,41 @@
       "when": 1780023600000,
       "tag": "0047_signature_class_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1780026000000,
+      "tag": "0048_job_run_partition",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1780027200000,
+      "tag": "0049_universe_killmail",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1780028400000,
+      "tag": "0050_system_locked_by",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1780114800000,
+      "tag": "0051_signature_eol",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1780118400000,
+      "tag": "0052_activity_rollup_daily",
+      "breakpoints": true
     }
   ]
 }

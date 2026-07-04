@@ -1,6 +1,8 @@
 import { eq, inArray } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { db } from '@/db/client';
 import {
+  apCharacter,
   apMapSignature,
   apMapSystem,
   universeConstellation,
@@ -38,6 +40,7 @@ export async function buildSystemNode(
   tx: Tx,
   mapSystemId: bigint,
 ): Promise<MapEventPatch<'system.added'>> {
+  const locker = alias(apCharacter, 'system_locker');
   const [row] = await tx
     .select({
       id: apMapSystem.id,
@@ -47,6 +50,8 @@ export async function buildSystemNode(
       intelNotes: apMapSystem.intelNotes,
       status: apMapSystem.status,
       locked: apMapSystem.locked,
+      lockedByCharacterId: apMapSystem.lockedByCharacterId,
+      lockedByName: locker.name,
       rallyAt: apMapSystem.rallyAt,
       positionX: apMapSystem.positionX,
       positionY: apMapSystem.positionY,
@@ -63,6 +68,7 @@ export async function buildSystemNode(
     .innerJoin(universeSystem, eq(apMapSystem.systemId, universeSystem.id))
     .innerJoin(universeConstellation, eq(universeSystem.constellationId, universeConstellation.id))
     .innerJoin(universeRegion, eq(universeConstellation.regionId, universeRegion.id))
+    .leftJoin(locker, eq(locker.id, apMapSystem.lockedByCharacterId))
     .where(eq(apMapSystem.id, mapSystemId));
   if (!row) throw new Error('System row vanished mid-transaction.');
 
@@ -90,8 +96,11 @@ export async function buildSystemNode(
     regionName: row.regionName,
     constellationName: row.constellationName,
     // Resolve to the far-side system class (matches loadMap's loadStatics);
-    // fall back to the raw WH code only when the class is unknown (K162-style).
-    statics: staticRows.map((s) => s.targetClass ?? s.name).filter((c): c is string => !!c),
+    // fall back to the raw WH code only when the class is unknown (K162-style),
+    // pairing each label with its type-id for the hover popover.
+    statics: staticRows
+      .map((s) => ({ label: s.targetClass ?? s.name, typeId: s.typeId }))
+      .filter((s): s is { label: string; typeId: number } => !!s.label),
     staticTypeIds: staticRows.map((s) => s.typeId),
     tradeHub:
       row.nearestTradeHubId != null && row.nearestTradeHubJumps != null
@@ -101,6 +110,9 @@ export async function buildSystemNode(
           }
         : null,
     locked: row.locked,
+    lockedByCharacterId:
+      row.lockedByCharacterId === null ? null : Number(row.lockedByCharacterId),
+    lockedByName: row.lockedByName,
     rallyAt: row.rallyAt ? row.rallyAt.toISOString() : null,
     positionX: row.positionX,
     positionY: row.positionY,
@@ -127,6 +139,7 @@ export async function loadSignaturesForSystems(
       groupKey: apMapSignature.groupKey,
       classKind: apMapSignature.classKind,
       typeId: apMapSignature.typeId,
+      eolStage: apMapSignature.eolStage,
       wormholeCode: universeWormhole.name,
       name: apMapSignature.name,
       description: apMapSignature.description,
@@ -146,6 +159,7 @@ export async function loadSignaturesForSystems(
     groupKey: s.groupKey,
     classKind: s.classKind,
     typeId: s.typeId,
+    eolStage: s.eolStage,
     wormholeCode: s.wormholeCode,
     name: s.name,
     description: s.description,

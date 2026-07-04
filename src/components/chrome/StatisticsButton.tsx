@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatisticsDialog } from '@/components/dialogs/StatisticsDialog';
+import { useCurrentMapScope } from '@/components/chrome/CurrentMapScopeContext';
 
 /**
  * Header entry point for the Statistics dialog. Owns the dialog's
@@ -11,6 +12,7 @@ import { StatisticsDialog } from '@/components/dialogs/StatisticsDialog';
  */
 export function StatisticsButton() {
   const [open, setOpen] = useState(false);
+  const mapScope = useCurrentMapScope();
   return (
     <>
       <Button
@@ -21,7 +23,7 @@ export function StatisticsButton() {
       >
         <BarChart3 />
       </Button>
-      <StatisticsDialog open={open} onOpenChange={setOpen} />
+      <StatisticsDialog open={open} onOpenChange={setOpen} defaultScope={mapScope} />
     </>
   );
 }

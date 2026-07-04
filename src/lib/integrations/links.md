@@ -5,8 +5,8 @@
 
 ---
 
-### dotlanSystemUrl(systemName: string): string
-Returns the DOTLAN system page URL for a solar-system name.
+### dotlanMapUrl(regionName: string, systemName: string): string
+Returns the DOTLAN region map view URL centered on a solar-system, for a region name and solar-system name.
 
 ---
 

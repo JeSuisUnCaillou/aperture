@@ -29,6 +29,7 @@ function signature(id: string, mapConnectionId: string | null): MapSignature {
     groupKey: null,
     classKind: null,
     typeId: null,
+    eolStage: 'none',
     wormholeCode: null,
     name: null,
     description: null,

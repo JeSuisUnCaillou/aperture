@@ -64,13 +64,17 @@ export type MapSystemNode = {
   effect: string | null;
   regionName: string;
   constellationName: string;
-  /** Target-class labels for each wormhole static (e.g. `["C3", "C5"]`); empty for k-space. */
-  statics: string[];
+  /** Display statics: each target-class label (e.g. `C3`) paired with its source `universe_wormhole.type_id` for the hover popover; empty for k-space. Excludes statics with no resolvable label (K162-style). */
+  statics: { label: string; typeId: number }[];
   /** `universe_wormhole.type_id` of each static — feeds client-side WH-type class filtering. */
   staticTypeIds: number[];
   /** Nearest trade hub within high-sec range (precomputed at SDE ingest); null when none. */
   tradeHub: { name: string; jumps: number } | null;
   locked: boolean;
+  /** EVE character id of the current lock holder; null when unlocked or the character was erased. */
+  lockedByCharacterId: number | null;
+  /** Resolved lock-holder name; null when unlocked or the character row is gone. */
+  lockedByName: string | null;
   /** ISO timestamp when the rally point was set; null when no rally is active. */
   rallyAt: string | null;
   positionX: number;
@@ -113,6 +117,8 @@ export type MapSignature = {
   classKind: SignatureClassKind | null;
   /** `universe_type.id`. Only meaningful when `groupKey === 'wormhole'` (points to a `universe_wormhole` row); otherwise null. */
   typeId: number | null;
+  /** Pre-jump EOL stage for a wormhole sig; transferred to the connection's `eolStage` on populate. Shares the connection's three-stage enum. */
+  eolStage: EolStage;
   /** Display-only wormhole code (e.g. "B274"), resolved server-side from `universe_wormhole.name`. Null when `typeId` is null or not a wormhole. */
   wormholeCode: string | null;
   /** For wormhole sigs: redundant mirror of `wormholeCode`. For cosmic sigs: the user-typed EVE site name string (e.g. "Forgotten Perimeter Habitation Coils"). Null when unknown. */
@@ -283,6 +289,7 @@ export async function loadMapForView(
     .where(and(eq(apMap.id, mapId), isNull(apMap.deletedAt)));
   if (!map) return null;
 
+  const systemLocker = alias(apCharacter, 'system_locker');
   const systemRows = await db
     .select({
       id: apMapSystem.id,
@@ -292,6 +299,8 @@ export async function loadMapForView(
       intelNotes: apMapSystem.intelNotes,
       status: apMapSystem.status,
       locked: apMapSystem.locked,
+      lockedByCharacterId: apMapSystem.lockedByCharacterId,
+      lockedByName: systemLocker.name,
       rallyAt: apMapSystem.rallyAt,
       positionX: apMapSystem.positionX,
       positionY: apMapSystem.positionY,
@@ -308,6 +317,7 @@ export async function loadMapForView(
     .innerJoin(universeSystem, eq(apMapSystem.systemId, universeSystem.id))
     .innerJoin(universeConstellation, eq(universeSystem.constellationId, universeConstellation.id))
     .innerJoin(universeRegion, eq(universeConstellation.regionId, universeRegion.id))
+    .leftJoin(systemLocker, eq(systemLocker.id, apMapSystem.lockedByCharacterId))
     .where(and(eq(apMapSystem.mapId, mapId), eq(apMapSystem.visible, true)))
     .orderBy(apMapSystem.id);
 
@@ -402,7 +412,7 @@ export async function loadMapForView(
       effect: s.effect,
       regionName: s.regionName,
       constellationName: s.constellationName,
-      statics: staticsBySystem.get(s.systemId)?.labels ?? [],
+      statics: staticsBySystem.get(s.systemId)?.display ?? [],
       staticTypeIds: staticsBySystem.get(s.systemId)?.typeIds ?? [],
       tradeHub:
         s.nearestTradeHubId != null && s.nearestTradeHubJumps != null
@@ -412,6 +422,9 @@ export async function loadMapForView(
             }
           : null,
       locked: s.locked,
+      lockedByCharacterId:
+        s.lockedByCharacterId === null ? null : Number(s.lockedByCharacterId),
+      lockedByName: s.lockedByName,
       rallyAt: s.rallyAt ? s.rallyAt.toISOString() : null,
       positionX: s.positionX,
       positionY: s.positionY,
@@ -628,7 +641,7 @@ export async function listAdminMaps(): Promise<AdminMapListItem[]> {
   }));
 }
 
-type SystemStatics = { labels: string[]; typeIds: number[] };
+type SystemStatics = { display: { label: string; typeId: number }[]; typeIds: number[] };
 
 async function loadStatics(systemIds: number[]): Promise<Map<number, SystemStatics>> {
   const grouped = new Map<number, SystemStatics>();
@@ -644,12 +657,12 @@ async function loadStatics(systemIds: number[]): Promise<Map<number, SystemStati
     .innerJoin(universeWormhole, eq(universeSystemStatic.typeId, universeWormhole.typeId))
     .where(inArray(universeSystemStatic.systemId, systemIds));
   for (const r of rows) {
-    const entry = grouped.get(r.systemId) ?? { labels: [], typeIds: [] };
+    const entry = grouped.get(r.systemId) ?? { display: [], typeIds: [] };
     entry.typeIds.push(r.typeId);
     const code = r.targetClass ?? r.name;
     // K162-style rows can have no resolvable far-side class: still a static
     // type-id for filtering, just no label to show on the node.
-    if (code) entry.labels.push(code);
+    if (code) entry.display.push({ label: code, typeId: r.typeId });
     grouped.set(r.systemId, entry);
   }
   return grouped;

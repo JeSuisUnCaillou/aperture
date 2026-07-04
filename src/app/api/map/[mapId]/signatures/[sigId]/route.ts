@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/session';
 import { deleteSignature, updateSignature } from '@/lib/map/mutations/signatures';
-import { signatureClassKind, signatureGroupKey } from '@/db/schema';
+import { eolStage, signatureClassKind, signatureGroupKey } from '@/db/schema';
 import { parseBigInt, requireMapMutate } from '../../../utils';
 import { withApiMetrics } from '@/lib/metrics/httpInstrumentation';
 
@@ -22,6 +22,7 @@ const updateSignatureBodySchema = z.object({
   groupKey: z.enum(signatureGroupKey.enumValues).nullable().optional(),
   classKind: z.enum(signatureClassKind.enumValues).nullable().optional(),
   typeId: z.number().int().positive().nullable().optional(),
+  eolStage: z.enum(eolStage.enumValues).optional(),
   name: z.string().max(100).nullable().optional(),
   description: z.string().nullable().optional(),
   expiresAt: z.string().datetime().optional(),
@@ -73,6 +74,7 @@ export const PATCH = withApiMetrics('/api/map/:mapId/signatures/:sigId', async f
   if ('groupKey' in parsed.data) patch.groupKey = parsed.data.groupKey;
   if ('classKind' in parsed.data) patch.classKind = parsed.data.classKind;
   if ('typeId' in parsed.data) patch.typeId = parsed.data.typeId;
+  if ('eolStage' in parsed.data) patch.eolStage = parsed.data.eolStage;
   if ('name' in parsed.data) patch.name = parsed.data.name;
   if ('description' in parsed.data) patch.description = parsed.data.description;
   if ('expiresAt' in parsed.data && parsed.data.expiresAt !== undefined) {

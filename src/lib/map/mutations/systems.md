@@ -39,7 +39,7 @@ Flips `visible = false` (and stamps `last_visible_at`) on the `ap_map_system` ro
 ---
 
 ### updateSystem(input: UpdateSystemInput): Promise<ActionResult<MapEventPayload>>
-Updates intel/position fields. Only keys present in `input.patch` are written (presence detected via `in`, so `null`/`false` are honored). `rallyAt` is a `Date | null` on input and crosses the wire as an ISO string (or null). Throws (rolls back) if no matching row. Emits `system.updated` → `{ id, ...changed }`.
+Updates intel/position fields. Only keys present in `input.patch` are written (presence detected via `in`, so `null`/`false` are honored). `rallyAt` is a `Date | null` on input and crosses the wire as an ISO string (or null). When `locked` is in the patch, the actor is stamped as the lock holder (`locked_by_character_id = characterId` on lock, `NULL` on unlock) and the payload carries `lockedByCharacterId` + the resolved `lockedByName`. Throws (rolls back) if no matching row. Emits `system.updated` → `{ id, ...changed }`.
 
 **Parameters:**
 - `input.patch` — `UpdateSystemPatch`: `alias`, `tag`, `status`, `intelNotes`, `locked`, `rallyAt`, `positionX`, `positionY` (all optional).

@@ -1,16 +1,18 @@
 import 'server-only';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/db/client';
 import {
+  universeConstellation,
   universeFactionWarSystem,
   universeIncursion,
+  universeRegion,
   universeSovereigntyMap,
   universeSystem,
 } from '@/db/schema';
 import {
   anoikSystemUrl,
   ccpImageUrl,
-  dotlanSystemUrl,
+  dotlanMapUrl,
   eveeyeSystemUrl,
   zkillboardSystemUrl,
 } from '@/lib/integrations/links';
@@ -86,8 +88,10 @@ type IncursionRow = {
 export async function intelForSystems(systemIds: number[]): Promise<Record<number, SystemIntelSummary>> {
   if (systemIds.length === 0) return {};
   const systems = await db
-    .select({ id: universeSystem.id, name: universeSystem.name })
+    .select({ id: universeSystem.id, name: universeSystem.name, regionName: universeRegion.name })
     .from(universeSystem)
+    .innerJoin(universeConstellation, eq(universeConstellation.id, universeSystem.constellationId))
+    .innerJoin(universeRegion, eq(universeRegion.id, universeConstellation.regionId))
     .where(inArray(universeSystem.id, systemIds));
   const [sovRows, fwRows, incursions, scoutRows] = await Promise.all([
     loadSov(systemIds),
@@ -124,7 +128,7 @@ export async function intelForSystems(systemIds: number[]): Promise<Record<numbe
       incursion: buildIncursion(incursionBySystem.get(system.id), system.id, names),
       scoutConnections: connectionsForSystem(scoutRows, system.id),
       links: {
-        dotlan: dotlanSystemUrl(system.name),
+        dotlan: dotlanMapUrl(system.regionName, system.name),
         eveeye: eveeyeSystemUrl(system.id),
         anoik: anoikSystemUrl(system.name),
         zkillboard: zkillboardSystemUrl(system.id),

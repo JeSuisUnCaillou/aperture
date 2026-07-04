@@ -112,6 +112,7 @@ export type CreateSignatureBody = {
   sigId: string;
   groupKey?: SignatureGroupKey | null;
   typeId?: number | null;
+  eolStage?: EolStage;
   name?: string | null;
   description?: string | null;
   /** ISO datetime string. */
@@ -123,6 +124,7 @@ export type UpdateSignatureBody = {
   sigId?: string;
   groupKey?: SignatureGroupKey | null;
   typeId?: number | null;
+  eolStage?: EolStage;
   name?: string | null;
   description?: string | null;
   expiresAt?: string;

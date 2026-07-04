@@ -1,9 +1,11 @@
 import 'server-only';
 import { and, eq, type InferInsertModel } from 'drizzle-orm';
-import { apMapConnection, apMapSignature, apMapSystem, universeWormhole } from '@/db/schema';
+import { apMapConnection, apMapSignature, apMapSystem, eolStage, universeWormhole } from '@/db/schema';
 import { commitMapEvent, type ActionResult, type Tx } from './core';
 import type { MapEventPatch, MapEventPayload } from '@/lib/realtime/protocol';
 import type { SignatureClassKind, SignatureGroupKey } from '@/types';
+
+type EolStage = (typeof eolStage.enumValues)[number];
 
 /**
  * Signature-level map mutations, each a single `commitMapEvent` call.
@@ -28,6 +30,7 @@ export type CreateSignatureInput = {
   groupKey?: SignatureGroupKey | null;
   classKind?: SignatureClassKind | null;
   typeId?: number | null;
+  eolStage?: EolStage;
   name?: string | null;
   description?: string | null;
   expiresAt: Date;
@@ -40,6 +43,7 @@ export type UpdateSignaturePatch = {
   groupKey?: SignatureGroupKey | null;
   classKind?: SignatureClassKind | null;
   typeId?: number | null;
+  eolStage?: EolStage;
   name?: string | null;
   description?: string | null;
   expiresAt?: Date;
@@ -79,6 +83,7 @@ export function createSignature(
           groupKey: input.groupKey ?? null,
           classKind: input.classKind ?? null,
           typeId: input.typeId ?? null,
+          eolStage: input.eolStage ?? 'none',
           name: input.name ?? null,
           description: input.description ?? null,
           expiresAt: input.expiresAt,
@@ -91,6 +96,7 @@ export function createSignature(
           groupKey: apMapSignature.groupKey,
           classKind: apMapSignature.classKind,
           typeId: apMapSignature.typeId,
+          eolStage: apMapSignature.eolStage,
           name: apMapSignature.name,
           description: apMapSignature.description,
           expiresAt: apMapSignature.expiresAt,
@@ -110,6 +116,7 @@ export function createSignature(
         groupKey: row!.groupKey,
         classKind: row!.classKind,
         typeId: row!.typeId,
+        eolStage: row!.eolStage,
         wormholeCode,
         name: row!.name,
         description: row!.description,
@@ -191,6 +198,7 @@ export function updateSignature(
       if ('groupKey' in patch) set.groupKey = patch.groupKey;
       if ('classKind' in patch) set.classKind = patch.classKind;
       if ('typeId' in patch) set.typeId = patch.typeId;
+      if ('eolStage' in patch) set.eolStage = patch.eolStage;
       if ('name' in patch) set.name = patch.name;
       if ('description' in patch) set.description = patch.description;
       if ('expiresAt' in patch) set.expiresAt = patch.expiresAt;
@@ -207,6 +215,7 @@ export function updateSignature(
           groupKey: apMapSignature.groupKey,
           classKind: apMapSignature.classKind,
           typeId: apMapSignature.typeId,
+          eolStage: apMapSignature.eolStage,
           name: apMapSignature.name,
           description: apMapSignature.description,
           expiresAt: apMapSignature.expiresAt,
@@ -250,6 +259,7 @@ export function updateSignature(
         out.typeId = patch.typeId;
         out.wormholeCode = wormholeCode;
       }
+      if ('eolStage' in patch) out.eolStage = patch.eolStage;
       if ('name' in patch) out.name = patch.name;
       if ('description' in patch) out.description = patch.description;
       if ('expiresAt' in patch) out.expiresAt = patch.expiresAt!.toISOString();
@@ -265,6 +275,7 @@ export function updateSignature(
         groupKey: row.groupKey,
         classKind: row.classKind,
         typeId: row.typeId,
+        eolStage: row.eolStage,
         wormholeCode,
         name: row.name,
         description: row.description,

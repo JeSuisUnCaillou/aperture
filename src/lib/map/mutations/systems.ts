@@ -2,6 +2,7 @@ import 'server-only';
 import { and, eq, inArray, ne, or, type InferInsertModel } from 'drizzle-orm';
 import { db } from '@/db/client';
 import {
+  apCharacter,
   apMap,
   apMapConnection,
   apMapSystem,
@@ -22,6 +23,16 @@ import type { MapEventPatch, MapEventPayload } from '@/lib/realtime/protocol';
  */
 
 type SystemStatus = (typeof systemStatus.enumValues)[number];
+
+/** Resolve an acting character's name for the lock-attribution payload. */
+async function resolveCharacterName(tx: Tx, characterId: bigint | null): Promise<string | null> {
+  if (characterId === null) return null;
+  const [row] = await tx
+    .select({ name: apCharacter.name })
+    .from(apCharacter)
+    .where(eq(apCharacter.id, characterId));
+  return row?.name ?? null;
+}
 
 export type AddSystemInput = {
   mapId: bigint;
@@ -196,7 +207,11 @@ export function updateSystem(input: UpdateSystemInput): Promise<ActionResult<Map
       if ('tag' in patch) set.tag = patch.tag;
       if ('status' in patch) set.status = patch.status;
       if ('intelNotes' in patch) set.intelNotes = patch.intelNotes;
-      if ('locked' in patch) set.locked = patch.locked;
+      // Locking stamps the actor; unlocking clears the attribution.
+      if ('locked' in patch) {
+        set.locked = patch.locked;
+        set.lockedByCharacterId = patch.locked ? input.characterId : null;
+      }
       if ('rallyAt' in patch) set.rallyAt = patch.rallyAt;
       if ('positionX' in patch) set.positionX = patch.positionX;
       if ('positionY' in patch) set.positionY = patch.positionY;
@@ -213,7 +228,12 @@ export function updateSystem(input: UpdateSystemInput): Promise<ActionResult<Map
       if ('tag' in patch) out.tag = patch.tag;
       if ('status' in patch) out.status = patch.status;
       if ('intelNotes' in patch) out.intelNotes = patch.intelNotes;
-      if ('locked' in patch) out.locked = patch.locked;
+      if ('locked' in patch) {
+        out.locked = patch.locked;
+        const lockedById = patch.locked ? input.characterId : null;
+        out.lockedByCharacterId = lockedById === null ? null : Number(lockedById);
+        out.lockedByName = patch.locked ? await resolveCharacterName(tx, input.characterId) : null;
+      }
       if ('rallyAt' in patch) out.rallyAt = patch.rallyAt ? patch.rallyAt.toISOString() : null;
       if ('positionX' in patch) out.positionX = patch.positionX;
       if ('positionY' in patch) out.positionY = patch.positionY;

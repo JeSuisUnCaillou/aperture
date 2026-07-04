@@ -15,6 +15,7 @@
 - `alias`, `tag`, `intel_notes` — `text`, nullable.
 - `status` — `system_status` enum, default `unknown`.
 - `locked` — `boolean`, default `false`.
+- `locked_by_character_id` — `bigint` FK → `ap_character.id` `ON DELETE SET NULL`, nullable (migration 0050). The current lock holder: stamped when `locked` flips true, NULLed when it flips false. Resolved to a name at load and carried on the realtime payload so the inspector shows who locked the system.
 - `rally_at` — `timestamptz`, nullable. Non-null ⇒ rally active.
 - `first_added_at` / `last_visible_at` / `updated_at` — `timestamptz`, default `now()`.
 

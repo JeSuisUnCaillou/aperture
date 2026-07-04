@@ -17,6 +17,7 @@ import {
   type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { arrayMove } from '@dnd-kit/sortable';
 import type { Layout, ResponsiveLayouts } from 'react-grid-layout';
 import type {
   Breakpoint,
@@ -27,6 +28,7 @@ import type {
   MapSignature,
   MapSystemNode,
   MapViewData,
+  PanelGroup,
   PanelId,
   RouteDestinationView,
   RoutePrefs,
@@ -39,6 +41,7 @@ import type { SystemIntelSummary } from '@/lib/map/intel';
 import { applyEvent } from '@/lib/map/applyEvent';
 import {
   GRID_SIZE,
+  MANUAL_SLOT,
   findOpenPosition,
   overlaps,
   snapToGrid as snapPointToGrid,
@@ -132,14 +135,29 @@ import { MapContextMenu } from './MapContextMenu';
 import { SubchainDeletePrompt } from './SubchainDeletePrompt';
 import { RestoreConnectionPrompt } from './RestoreConnectionPrompt';
 import { MapLayoutGrid } from './layout/MapLayoutGrid';
-import { MapPanel } from './layout/MapPanel';
-import { DEFAULT_MAP_LAYOUT, PANELS, ensurePanelsPlaced } from '@/lib/map/layout/panels';
+import { MapPanelGroup } from './layout/MapPanelGroup';
+import { PanelDndContext } from './layout/PanelDndContext';
+import {
+  DEFAULT_MAP_LAYOUT,
+  PANELS,
+  PANEL_COLS,
+  PANEL_MIN,
+  dedupeGroups,
+  ensurePanelsPlaced,
+  migrateLayout,
+  removePanelFromLayout,
+} from '@/lib/map/layout/panels';
 import { mapLayoutConfigSchema } from '@/lib/map/layout/schema';
 import { setMapLayoutAction } from '@/app/(app)/actions/account';
 import { toast } from 'sonner';
 
 // Debounce window for persisting layout edits (drag/resize/hide) to the server.
 const LAYOUT_SAVE_DEBOUNCE_MS = 600;
+
+// Cadence for re-pulling read-side per-system intel/stats for systems already on
+// the map. Floored at the ~5min server refresh-job cadence — polling faster than
+// the underlying data changes would just be waste against the shared deployment.
+const SYSTEM_DATA_REFRESH_MS = 5 * 60 * 1000;
 
 // Compact character selector for the map toolbar. Must render inside
 // MapActiveCharProvider (which is inside MapPresenceProvider).
@@ -383,6 +401,39 @@ export function MapCanvas({
     });
   }, [viewData.systems, data.map.id]);
 
+  // Distinct EVE system ids currently on the map, mirrored into a ref so the
+  // periodic refresh below reads a fresh set without re-arming its interval on
+  // every viewData change (drag, realtime, optimistic patch).
+  const onMapSystemIds = useMemo(
+    () => [...new Set(viewData.systems.map((s) => s.systemId))],
+    [viewData.systems],
+  );
+  const onMapSystemIdsRef = useRef(onMapSystemIds);
+  useEffect(() => {
+    onMapSystemIdsRef.current = onMapSystemIds;
+  }, [onMapSystemIds]);
+
+  // Read-side intel/stats drift as their server refresh jobs (incursion, sov/FW,
+  // hourly stats) run; a long-lived open map never picks that up. Re-pull the
+  // whole on-map set on an interval and reference-replace intel/stats so the
+  // node-sync key rebuilds decorators. Skips while the tab is hidden to avoid
+  // polling the shared deployment for a view nobody is looking at. Structures are
+  // deliberately not re-merged: they carry the user's own un-echoed CRUD edits
+  // and have no server refresh job, so overwriting them would only risk clobber.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      const systemIds = onMapSystemIdsRef.current;
+      if (systemIds.length === 0) return;
+      fetchSystemData({ mapId: data.map.id, systemIds }).then((result) => {
+        if (!result.ok) return;
+        setIntel((prev) => ({ ...prev, ...result.data.intel }));
+        setStats((prev) => ({ ...prev, ...result.data.stats }));
+      });
+    }, SYSTEM_DATA_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [data.map.id]);
+
   const [nodes, setNodes] = useState<CanvasNode[]>(() => [
     ...data.systems.map((s) => ({
       id: s.id,
@@ -461,12 +512,18 @@ export function MapCanvas({
 
   // ---- Free-form dashboard layout (map-layout-builder) -------------------
   // Seeded from the saved per-account layout; `null` ⇒ the default arrangement.
-  // `ensurePanelsPlaced` auto-places any registered panel missing from a saved
-  // layout (a panel that shipped after the user last saved) — forward-compat,
-  // no data migration. A no-op for `DEFAULT_MAP_LAYOUT` (already complete).
+  // `migrateLayout` upgrades a pre-v2 blob (no grouping) to singleton groups;
+  // `dedupeGroups` heals any panel that a stale build resurrected as a duplicate
+  // cell; `ensurePanelsPlaced` then auto-places any registered panel missing from
+  // a saved layout (a panel that shipped after the user last saved). All are
+  // normalisers, no data migration. No-ops for `DEFAULT_MAP_LAYOUT` (already
+  // current and complete).
   const [layout, setLayout] = useState<MapLayoutConfig>(() =>
-    ensurePanelsPlaced(mapLayout ?? DEFAULT_MAP_LAYOUT),
+    ensurePanelsPlaced(dedupeGroups(migrateLayout(mapLayout ?? DEFAULT_MAP_LAYOUT))),
   );
+  // The grid's active responsive breakpoint (reported by `MapLayoutGrid`). Grouping
+  // is per-breakpoint, so the rendered cells read from `layout.groups[breakpoint]`.
+  const [breakpoint, setBreakpoint] = useState<Breakpoint>('lg');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // RGL fires `onLayoutChange` once on mount with its normalized layout; that
   // first call updates local state but must not persist (no spurious write per
@@ -497,11 +554,15 @@ export function MapCanvas({
     [saveLayout],
   );
 
+  // Hide a panel (tab ✕ or panels-menu uncheck). The panel leaves its group's
+  // tab strip in every breakpoint (`removePanelFromLayout` re-keys/drops the
+  // group as needed, picking a new active tab) and lands in `hidden`.
   const handleHide = useCallback(
     (id: PanelId) => {
       setLayout((prev) => {
         if (prev.hidden.includes(id)) return prev;
-        const next: MapLayoutConfig = { ...prev, hidden: [...prev.hidden, id] };
+        const removed = removePanelFromLayout(prev, id);
+        const next: MapLayoutConfig = { ...removed, hidden: [...prev.hidden, id] };
         saveLayout(next);
         return next;
       });
@@ -510,20 +571,211 @@ export function MapCanvas({
   );
 
   // Panels-menu checkbox: flip a panel between hidden and visible. Re-showing a
-  // panel returns it to its preserved slot — `mergeLayouts` keeps a hidden
-  // panel's geometry, so the grid replaces it where it was, not at the bottom.
+  // panel drops it from `hidden` and `ensurePanelsPlaced` re-adds it as a fresh
+  // singleton group at the bottom of each breakpoint (a hidden panel has no
+  // preserved slot — hiding removed its group). Hiding routes through the same
+  // group-aware removal as the tab ✕.
   const handleToggleVisible = useCallback(
     (id: PanelId) => {
       setLayout((prev) => {
-        const hidden = prev.hidden.includes(id)
-          ? prev.hidden.filter((h) => h !== id)
-          : [...prev.hidden, id];
-        const next: MapLayoutConfig = { ...prev, hidden };
+        let next: MapLayoutConfig;
+        if (prev.hidden.includes(id)) {
+          next = ensurePanelsPlaced({ ...prev, hidden: prev.hidden.filter((h) => h !== id) });
+        } else {
+          const removed = removePanelFromLayout(prev, id);
+          next = { ...removed, hidden: [...prev.hidden, id] };
+        }
         saveLayout(next);
         return next;
       });
     },
     [saveLayout],
+  );
+
+  // Switch a group's active tab. Applies to every breakpoint that holds a group
+  // with this id whose members include the panel (a singleton/reused id spans
+  // breakpoints; a per-breakpoint-only group matches only where it exists).
+  const handleSetActiveTab = useCallback(
+    (groupId: string, panel: PanelId) => {
+      setLayout((prev) => {
+        const groups = { ...prev.groups };
+        for (const bp of Object.keys(prev.groups) as Breakpoint[]) {
+          groups[bp] = prev.groups[bp].map((g) =>
+            g.id === groupId && g.members.includes(panel) ? { ...g, active: panel } : g,
+          );
+        }
+        const next: MapLayoutConfig = { ...prev, groups };
+        saveLayout(next);
+        return next;
+      });
+    },
+    [saveLayout],
+  );
+
+  // Move a member panel out of its current group and append it as a new active
+  // tab of `targetGroupId`, scoped to the active breakpoint (grouping is
+  // per-breakpoint). If the source group empties it is dropped, along with its
+  // grid item in `layouts[bp]` — `mergeLayouts` keeps only `prev` items, so a
+  // removed item is not resurrected by RGL's next `onLayoutChange`.
+  const mergePanelIntoGroup = useCallback(
+    (sourcePanel: PanelId, targetGroupId: string) => {
+      setLayout((prev) => {
+        const bp = breakpoint;
+        const source = prev.groups[bp].find((g) => g.members.includes(sourcePanel));
+        const target = prev.groups[bp].find((g) => g.id === targetGroupId);
+        if (!source || !target || source.id === targetGroupId) return prev;
+        const droppedIds = new Set<string>();
+        // Old group id → new anchor id, when removing the source's anchor member
+        // forces a re-key; its `layouts[bp]` item is renamed to match.
+        const renamed = new Map<string, PanelId>();
+        const groupsBp = prev.groups[bp].flatMap((g) => {
+          if (g.id === source.id) {
+            const members = g.members.filter((m) => m !== sourcePanel);
+            if (members.length === 0) {
+              droppedIds.add(g.id);
+              return [];
+            }
+            const active = g.active === sourcePanel ? members[0]! : g.active;
+            // A group's id must stay one of its members. If the removed panel was
+            // the anchor id, re-key to the new active so the freed PanelId isn't
+            // later reused for a second cell with a colliding id (duplicate keys).
+            if (g.id === sourcePanel) {
+              renamed.set(g.id, active);
+              return [{ id: active, members, active }];
+            }
+            return [{ ...g, members, active }];
+          }
+          if (g.id === targetGroupId) {
+            return [{ ...g, members: [...g.members, sourcePanel], active: sourcePanel }];
+          }
+          return [g];
+        });
+        const groups = { ...prev.groups, [bp]: groupsBp };
+        const layouts =
+          droppedIds.size > 0 || renamed.size > 0
+            ? {
+                ...prev.layouts,
+                [bp]: prev.layouts[bp]
+                  .filter((i) => !droppedIds.has(i.i))
+                  .map((it) => {
+                    const newId = renamed.get(it.i);
+                    return newId ? { ...it, i: newId, ...PANEL_MIN[newId] } : it;
+                  }),
+              }
+            : prev.layouts;
+        const next: MapLayoutConfig = { ...prev, groups, layouts };
+        saveLayout(next);
+        return next;
+      });
+    },
+    [breakpoint, saveLayout],
+  );
+
+  // Reorder a tab within its own group's header (active breakpoint only). No-op
+  // if either panel is missing or the order is unchanged.
+  const reorderTab = useCallback(
+    (groupId: string, fromPanel: PanelId, toPanel: PanelId) => {
+      setLayout((prev) => {
+        const bp = breakpoint;
+        const group = prev.groups[bp].find((g) => g.id === groupId);
+        if (!group) return prev;
+        const from = group.members.indexOf(fromPanel);
+        const to = group.members.indexOf(toPanel);
+        if (from < 0 || to < 0 || from === to) return prev;
+        const members = arrayMove(group.members, from, to);
+        const groupsBp = prev.groups[bp].map((g) => (g.id === groupId ? { ...g, members } : g));
+        const next: MapLayoutConfig = { ...prev, groups: { ...prev.groups, [bp]: groupsBp } };
+        saveLayout(next);
+        return next;
+      });
+    },
+    [breakpoint, saveLayout],
+  );
+
+  // Split a member out of its group into its own new singleton cell at a snapped
+  // grid position (active breakpoint only). The new group/layout-item id is the
+  // panel's `PanelId` (grid ids live in the `PanelId` space). When the panel is its
+  // group's anchor id, the source group + its layout item are first re-keyed to a
+  // remaining member so the id isn't claimed by two cells. A singleton source has no
+  // group to split — it already owns item `i === source.id`, so this just moves it.
+  const tearOffTab = useCallback(
+    (panel: PanelId, x: number, y: number) => {
+      setLayout((prev) => {
+        const bp = breakpoint;
+        const source = prev.groups[bp].find((g) => g.members.includes(panel));
+        if (!source) return prev;
+        const cols = PANEL_COLS[bp];
+        const { minW, minH } = PANEL_MIN[panel];
+        const w = Math.min(cols, minW);
+        const clampedX = Math.max(0, Math.min(x, cols - w));
+        const clampedY = Math.max(0, y);
+
+        if (source.members.length === 1) {
+          const layoutsBp = prev.layouts[bp].map((it) =>
+            it.i === source.id ? { ...it, x: clampedX, y: clampedY } : it,
+          );
+          const next: MapLayoutConfig = { ...prev, layouts: { ...prev.layouts, [bp]: layoutsBp } };
+          saveLayout(next);
+          return next;
+        }
+
+        const remaining = source.members.filter((m) => m !== panel);
+        const newActive = source.active === panel ? remaining[0]! : source.active;
+
+        let groupsBp: PanelGroup[];
+        let layoutsBp = prev.layouts[bp];
+        if (source.id === panel) {
+          const newSourceId = newActive;
+          groupsBp = prev.groups[bp].map((g) =>
+            g.id === source.id ? { id: newSourceId, members: remaining, active: newActive } : g,
+          );
+          layoutsBp = layoutsBp.map((it) =>
+            it.i === source.id ? { ...it, i: newSourceId, ...PANEL_MIN[newSourceId] } : it,
+          );
+        } else {
+          groupsBp = prev.groups[bp].map((g) =>
+            g.id === source.id ? { ...g, members: remaining, active: newActive } : g,
+          );
+        }
+
+        groupsBp = [...groupsBp, { id: panel, members: [panel], active: panel }];
+        layoutsBp = [...layoutsBp, { i: panel, x: clampedX, y: clampedY, w, h: minH, minW, minH }];
+
+        const next: MapLayoutConfig = {
+          ...prev,
+          groups: { ...prev.groups, [bp]: groupsBp },
+          layouts: { ...prev.layouts, [bp]: layoutsBp },
+        };
+        saveLayout(next);
+        return next;
+      });
+    },
+    [breakpoint, saveLayout],
+  );
+
+  // dnd-kit drop dispatcher: `overId` is either a `grp:<groupId>` header or a
+  // bare `PanelId` tab. Same group ⇒ reorder; different group (or a header) ⇒
+  // merge. Resolved against the active breakpoint's groups. A drop on the open grid
+  // surface (tear-off) is handled separately by `MapLayoutGrid` and falls through
+  // here as a no-op (its `overId` matches no `grp:` prefix and no member).
+  const handlePanelDrop = useCallback(
+    (activePanel: PanelId, overId: string) => {
+      const groupsBp = layout.groups[breakpoint] ?? [];
+      if (overId.startsWith('grp:')) {
+        mergePanelIntoGroup(activePanel, overId.slice(4));
+        return;
+      }
+      const overPanel = overId as PanelId;
+      const overGroup = groupsBp.find((g) => g.members.includes(overPanel));
+      const sourceGroup = groupsBp.find((g) => g.members.includes(activePanel));
+      if (!overGroup || !sourceGroup) return;
+      if (overGroup.id === sourceGroup.id) {
+        reorderTab(sourceGroup.id, activePanel, overPanel);
+      } else {
+        mergePanelIntoGroup(activePanel, overGroup.id);
+      }
+    },
+    [layout.groups, breakpoint, mergePanelIntoGroup, reorderTab],
   );
 
   // Reset to the shipped arrangement. Clone so later immutable updates can never
@@ -565,7 +817,7 @@ export function MapCanvas({
         toast.error('This file is not a valid Aperture layout.');
         return;
       }
-      const next = ensurePanelsPlaced(parsed.data);
+      const next = ensurePanelsPlaced(dedupeGroups(migrateLayout(parsed.data)));
       setLayout(next);
       saveLayout(next);
       toast.success('Layout imported.');
@@ -723,8 +975,8 @@ export function MapCanvas({
       const existing = viewData.systems.find((s) => s.id === id);
       if (!node || !existing) continue;
       const snapped = snapPointToGrid(node.position);
-      const final = occupiedOthers.some((o) => overlaps(snapped, o))
-        ? findOpenPosition(snapped, occupiedOthers)
+      const final = occupiedOthers.some((o) => overlaps(snapped, o, MANUAL_SLOT))
+        ? findOpenPosition(snapped, occupiedOthers, MANUAL_SLOT)
         : snapped;
       if (existing.positionX === final.x && existing.positionY === final.y) continue;
       const patch: UpdateSystemBody = { positionX: final.x, positionY: final.y };
@@ -794,8 +1046,8 @@ export function MapCanvas({
       const occupiedOthers: Point[] = viewData.systems
         .filter((s) => s.id !== node.id)
         .map((s) => ({ x: s.positionX, y: s.positionY }));
-      const final = occupiedOthers.some((o) => overlaps(snapped, o))
-        ? findOpenPosition(snapped, occupiedOthers)
+      const final = occupiedOthers.some((o) => overlaps(snapped, o, MANUAL_SLOT))
+        ? findOpenPosition(snapped, occupiedOthers, MANUAL_SLOT)
         : snapped;
       if (existing.positionX === final.x && existing.positionY === final.y) return;
       const patch: UpdateSystemBody = { positionX: final.x, positionY: final.y };
@@ -1493,21 +1745,42 @@ export function MapCanvas({
     }
     for (const ids of groups.values()) ids.sort();
 
+    // Resolve each connection's source wormhole from its attached signatures,
+    // preferring the named side over the K162 reverse-exit (the named hole is the
+    // one carrying routing / mass / lifetime static data). Feeds the edge's
+    // detail popover.
+    const whByConn = new Map<string, { typeId: number; code: string | null }>();
+    for (const sig of viewData.signatures) {
+      if (sig.mapConnectionId == null || sig.typeId == null) continue;
+      const existing = whByConn.get(sig.mapConnectionId);
+      if (!existing || (existing.code === 'K162' && sig.wormholeCode !== 'K162')) {
+        whByConn.set(sig.mapConnectionId, { typeId: sig.typeId, code: sig.wormholeCode });
+      }
+    }
+
     return viewData.connections.map((c) => {
       const key = [c.source, c.target].sort().join('\0');
       const group = groups.get(key)!;
       const parallelIndex = group.indexOf(c.id);
       const parallelCount = group.length;
+      const wh = whByConn.get(c.id) ?? null;
       return {
         id: c.id,
         type: 'connection',
         source: c.source,
         target: c.target,
-        data: { ...c, parallelIndex, parallelCount },
+        data: {
+          ...c,
+          parallelIndex,
+          parallelCount,
+          mapId: viewData.map.id,
+          wormholeTypeId: wh?.typeId ?? null,
+          wormholeCode: wh?.code ?? null,
+        },
         selected: selected?.kind === 'connection' && selected.id === c.id,
       };
     });
-  }, [viewData.connections, selected]);
+  }, [viewData.connections, viewData.signatures, viewData.map.id, selected]);
 
   const selectedSystem: MapSystemNode | null = useMemo(() => {
     if (selected?.kind !== 'system') return null;
@@ -1578,7 +1851,12 @@ export function MapCanvas({
 
   // Panels the user hasn't hidden, in registry order. Order is cosmetic — the
   // grid positions by each item's `i`, not by child order.
-  const visiblePanels = PANELS.filter((p) => !layout.hidden.includes(p.id));
+  // One grid cell per group in the active breakpoint whose members aren't all
+  // hidden. `layout.groups[breakpoint]` may be undefined before the first
+  // breakpoint report resolves against a hand-authored blob.
+  const visibleGroups = (layout.groups[breakpoint] ?? []).filter((g) =>
+    g.members.some((m) => !layout.hidden.includes(m)),
+  );
 
   // The JSX for one panel's body. The canvas keeps its own positioned wrapper
   // (overlays + menu + dialog); the rest are the existing sidebar/signature
@@ -1915,23 +2193,30 @@ export function MapCanvas({
               )}
             </div>
           </div>
-          <MapLayoutGrid layouts={layout.layouts} onLayoutChange={handleLayoutChange}>
-            {visiblePanels.map((p) => (
-              <div key={p.id}>
-                <MapPanel
-                  id={p.id}
-                  title={p.title}
-                  onHide={handleHide}
-                  headerRight={panelHeaderRight(p.id)}
-                  contentClassName={
-                    p.id === 'canvas' ? 'min-h-0 flex-1 overflow-hidden p-0' : undefined
-                  }
-                >
-                  {panelContent(p.id)}
-                </MapPanel>
-              </div>
-            ))}
-          </MapLayoutGrid>
+          <PanelDndContext onDragEnd={handlePanelDrop}>
+            <MapLayoutGrid
+              layouts={layout.layouts}
+              onLayoutChange={handleLayoutChange}
+              onBreakpointChange={setBreakpoint}
+              onTearOff={tearOffTab}
+            >
+              {visibleGroups.map((g) => (
+                <div key={g.id}>
+                  <MapPanelGroup
+                    group={g}
+                    hidden={layout.hidden}
+                    onSetActive={handleSetActiveTab}
+                    onHideMember={handleHide}
+                    renderContent={panelContent}
+                    renderHeaderRight={panelHeaderRight}
+                    contentClassName={(id) =>
+                      id === 'canvas' ? 'min-h-0 flex-1 overflow-hidden p-0' : undefined
+                    }
+                  />
+                </div>
+              ))}
+            </MapLayoutGrid>
+          </PanelDndContext>
         </div>
 
         <MapInfoDialog open={mapInfoOpen} onOpenChange={setMapInfoOpen} viewData={viewData} />

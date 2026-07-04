@@ -276,7 +276,7 @@ export function SignatureSearchModule({
             {rows.map(({ sig, system, ageMs }) => (
               <tr
                 key={sig.id}
-                className="group border-t border-foreground/10 align-middle hover:bg-muted/30"
+                className="group border-t border-foreground/10 align-middle even:bg-foreground/[0.03] hover:bg-muted/30"
               >
                 <td className="px-2 py-px font-mono text-xs">{sig.sigId}</td>
                 <td className="px-2 py-px">
