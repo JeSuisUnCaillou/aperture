@@ -282,7 +282,8 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
     metaByTypeId,
     assignedConnectionIds,
   } = table.options.meta as SignatureTableMeta;
-  const leadsToMissing = sig.groupKey === 'wormhole' && sig.mapConnectionId === null;
+  if (sig.groupKey !== 'wormhole') return null;
+  const leadsToMissing = sig.mapConnectionId === null;
   return (
     <div className={`px-1 py-px${leadsToMissing ? ` ${MISSING_CELL}` : ''}`}>
       <ConnectionSelect
@@ -296,7 +297,6 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
           // Populate: carry the pre-jump EOL stage onto the connection.
           syncConnectionEol(sig.eolStage, next);
         }}
-        disabled={sig.groupKey !== 'wormhole'}
         targetClass={
           sig.typeId == null ? null : metaByTypeId.get(sig.typeId)?.targetClass ?? null
         }
@@ -311,13 +311,13 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
 // connection offers in its right-click menu. For a wormhole sig linked to a
 // connection the connection's `eolStage` is authoritative (so the stage shows in
 // and edits from both places); before a connection exists the sig carries the
-// stage in `eolStage`, transferred onto the connection on populate. Disabled/greyed
-// for non-wormhole sigs, mirroring the "Leads to" cell.
+// stage in `eolStage`, transferred onto the connection on populate. Renders an
+// empty cell for non-wormhole sigs, mirroring the "Leads to" cell.
 function EolCell({ row, table }: CellContext<MapSignature, unknown>) {
   const sig = row.original;
   const { connections, onPatch, onConnectionPatch } =
     table.options.meta as SignatureTableMeta;
-  const isWh = sig.groupKey === 'wormhole';
+  if (sig.groupKey !== 'wormhole') return null;
   const linkedConn =
     sig.mapConnectionId != null
       ? connections.find((c) => c.id === sig.mapConnectionId) ?? null
@@ -327,7 +327,6 @@ function EolCell({ row, table }: CellContext<MapSignature, unknown>) {
     <div className="px-1 py-px">
       <EolStageSelect
         value={stage}
-        disabled={!isWh}
         onValueChange={(next) => {
           if (linkedConn) onConnectionPatch(linkedConn.id, { eolStage: next });
           else onPatch(sig.id, { eolStage: next });
@@ -352,12 +351,10 @@ const EOL_STAGE_SHORT_LABELS: Record<EolStage, string> = {
 function EolStageSelect({
   value,
   onValueChange,
-  disabled = false,
   triggerClassName,
 }: {
   value: EolStage;
   onValueChange: (next: EolStage) => void;
-  disabled?: boolean;
   triggerClassName?: string;
 }) {
   return (
@@ -365,7 +362,6 @@ function EolStageSelect({
       value={value}
       onValueChange={(next) => next && onValueChange(next)}
       items={EOL_STAGE_SHORT_LABELS}
-      disabled={disabled}
     >
       <SelectTrigger
         className={cn(
