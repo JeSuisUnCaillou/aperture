@@ -153,6 +153,11 @@ import { toast } from 'sonner';
 // Debounce window for persisting layout edits (drag/resize/hide) to the server.
 const LAYOUT_SAVE_DEBOUNCE_MS = 600;
 
+// Cadence for re-pulling read-side per-system intel/stats for systems already on
+// the map. Floored at the ~5min server refresh-job cadence — polling faster than
+// the underlying data changes would just be waste against the shared deployment.
+const SYSTEM_DATA_REFRESH_MS = 5 * 60 * 1000;
+
 // Compact character selector for the map toolbar. Must render inside
 // MapActiveCharProvider (which is inside MapPresenceProvider).
 function ActiveCharSelector() {
@@ -394,6 +399,39 @@ export function MapCanvas({
       setStructures((prev) => ({ ...prev, ...result.data.structures }));
     });
   }, [viewData.systems, data.map.id]);
+
+  // Distinct EVE system ids currently on the map, mirrored into a ref so the
+  // periodic refresh below reads a fresh set without re-arming its interval on
+  // every viewData change (drag, realtime, optimistic patch).
+  const onMapSystemIds = useMemo(
+    () => [...new Set(viewData.systems.map((s) => s.systemId))],
+    [viewData.systems],
+  );
+  const onMapSystemIdsRef = useRef(onMapSystemIds);
+  useEffect(() => {
+    onMapSystemIdsRef.current = onMapSystemIds;
+  }, [onMapSystemIds]);
+
+  // Read-side intel/stats drift as their server refresh jobs (incursion, sov/FW,
+  // hourly stats) run; a long-lived open map never picks that up. Re-pull the
+  // whole on-map set on an interval and reference-replace intel/stats so the
+  // node-sync key rebuilds decorators. Skips while the tab is hidden to avoid
+  // polling the shared deployment for a view nobody is looking at. Structures are
+  // deliberately not re-merged: they carry the user's own un-echoed CRUD edits
+  // and have no server refresh job, so overwriting them would only risk clobber.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      const systemIds = onMapSystemIdsRef.current;
+      if (systemIds.length === 0) return;
+      fetchSystemData({ mapId: data.map.id, systemIds }).then((result) => {
+        if (!result.ok) return;
+        setIntel((prev) => ({ ...prev, ...result.data.intel }));
+        setStats((prev) => ({ ...prev, ...result.data.stats }));
+      });
+    }, SYSTEM_DATA_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [data.map.id]);
 
   const [nodes, setNodes] = useState<CanvasNode[]>(() => [
     ...data.systems.map((s) => ({
