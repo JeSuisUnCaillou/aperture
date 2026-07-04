@@ -691,8 +691,14 @@ export function MapCanvas({
   // ---- xyflow → server callbacks -----------------------------------------
   const mapId = viewData.map.id;
 
+  // Node `selected` is fully derived from app state (`selectedSystemIds` /
+  // `selected`) via the sync block below — never from xyflow's own selection
+  // store. Drop xyflow's internal `select` changes (e.g. the pane click's
+  // built-in "unselect all") so a background click can't wipe the outline out
+  // from under state that still considers the system selected.
   const onNodesChange = useCallback((changes: NodeChange<CanvasNode>[]) => {
-    setNodes((nds) => applyNodeChanges(changes, nds));
+    const filtered_changes = changes.filter((c) => c.type !== 'select');
+    setNodes((nds) => applyNodeChanges(filtered_changes, nds));
   }, []);
 
   // Commit the post-drag positions of every selected system. xyflow drags all
