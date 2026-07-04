@@ -72,7 +72,7 @@ function loadPersistedFilter(): PersistedFilter {
  * the inner select trigger or text input by their `data-slot`.
  */
 const MISSING_CELL =
-  '[&_[data-slot=select-trigger]]:border-destructive [&_[data-slot=input]]:border-destructive';
+  '[&_[data-slot=select-trigger]]:border-2 [&_[data-slot=select-trigger]]:border-destructive/50 [&_[data-slot=input]]:border-2 [&_[data-slot=input]]:border-destructive/50';
 
 /**
  * Strips the "pill" affordance off an in-table select trigger / text input so a
