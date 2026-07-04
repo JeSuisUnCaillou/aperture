@@ -14,6 +14,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { WormholeTypeSelect } from './WormholeTypeSelect';
 import { SignatureGroupSelect } from './SignatureGroupSelect';
 import { ConnectionSelect } from './ConnectionSelect';
@@ -33,7 +40,12 @@ import type {
   UpdateConnectionBody,
   UpdateSignatureBody,
 } from '@/lib/map/client';
-import type { WhJumpMass } from '@/lib/map/enumLabels';
+import {
+  EOL_STAGES,
+  EOL_STAGE_LABELS,
+  type EolStage,
+  type WhJumpMass,
+} from '@/lib/map/enumLabels';
 import { fetchWormholeCatalog } from '@/lib/map/client';
 import { SIGNATURE_GROUP_CATALOG } from '@/lib/map/signatureGroups';
 import { formatAgoFromMs } from '@/lib/map/relativeTime';
@@ -95,6 +107,7 @@ const colHeaderClass: Record<string, string> = {
   type: 'w-56 px-3 py-0.5 text-left',
   description: 'px-3 py-0.5 text-left',
   leadsTo: 'w-44 px-3 py-0.5 text-left',
+  eol: 'w-20 px-3 py-0.5 text-left',
   createdAt: 'w-24 px-1 py-0.5 text-left',
   updatedAt: 'w-24 px-1 py-0.5 text-left',
   actions: 'w-10 px-1 py-0.5',
@@ -169,7 +182,9 @@ type SignatureTableMeta = {
   systems: MapSystemNode[];
   onPatch: (signatureId: string, patch: UpdateSignatureBody) => void;
   onDelete: (signatureId: string) => void;
+  onConnectionPatch: (connectionId: string, patch: UpdateConnectionBody) => void;
   syncConnectionSize: (typeId: number | null, connectionId: string | null) => void;
+  syncConnectionEol: (stage: EolStage, connectionId: string | null) => void;
   metaByTypeId: Map<number, WormholeTypeMeta>;
   assignedConnectionIds: string[];
 };
@@ -263,6 +278,7 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
     systems,
     onPatch,
     syncConnectionSize,
+    syncConnectionEol,
     metaByTypeId,
     assignedConnectionIds,
   } = table.options.meta as SignatureTableMeta;
@@ -277,6 +293,8 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
         onValueChange={(next) => {
           onPatch(sig.id, { mapConnectionId: next });
           syncConnectionSize(sig.typeId, next);
+          // Populate: carry the pre-jump EOL stage onto the connection.
+          syncConnectionEol(sig.eolStage, next);
         }}
         disabled={sig.groupKey !== 'wormhole'}
         targetClass={
@@ -286,6 +304,86 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
         triggerClassName={FLAT_TRIGGER}
       />
     </div>
+  );
+}
+
+// EOL-stage picker (none / eol / critical), the same three-stage control the
+// connection offers in its right-click menu. For a wormhole sig linked to a
+// connection the connection's `eolStage` is authoritative (so the stage shows in
+// and edits from both places); before a connection exists the sig carries the
+// stage in `eolStage`, transferred onto the connection on populate. Disabled/greyed
+// for non-wormhole sigs, mirroring the "Leads to" cell.
+function EolCell({ row, table }: CellContext<MapSignature, unknown>) {
+  const sig = row.original;
+  const { connections, onPatch, onConnectionPatch } =
+    table.options.meta as SignatureTableMeta;
+  const isWh = sig.groupKey === 'wormhole';
+  const linkedConn =
+    sig.mapConnectionId != null
+      ? connections.find((c) => c.id === sig.mapConnectionId) ?? null
+      : null;
+  const stage = linkedConn ? linkedConn.eolStage : sig.eolStage;
+  return (
+    <div className="px-1 py-px">
+      <EolStageSelect
+        value={stage}
+        disabled={!isWh}
+        onValueChange={(next) => {
+          if (linkedConn) onConnectionPatch(linkedConn.id, { eolStage: next });
+          else onPatch(sig.id, { eolStage: next });
+        }}
+        triggerClassName={FLAT_TRIGGER}
+      />
+    </div>
+  );
+}
+
+// Terse trigger labels (the descriptive `EOL_STAGE_LABELS` wrap in the narrow
+// column when the select is closed); the dropdown keeps the full labels.
+const EOL_STAGE_SHORT_LABELS: Record<EolStage, string> = {
+  none: 'None',
+  eol: '4h',
+  critical: '1h',
+};
+
+// The three EOL stages share the connection's `EOL_STAGE_LABELS` in the dropdown.
+// `eol`/`critical` tint amber so a live hole stands out; `none` reads as muted
+// static text.
+function EolStageSelect({
+  value,
+  onValueChange,
+  disabled = false,
+  triggerClassName,
+}: {
+  value: EolStage;
+  onValueChange: (next: EolStage) => void;
+  disabled?: boolean;
+  triggerClassName?: string;
+}) {
+  return (
+    <Select<EolStage>
+      value={value}
+      onValueChange={(next) => next && onValueChange(next)}
+      items={EOL_STAGE_SHORT_LABELS}
+      disabled={disabled}
+    >
+      <SelectTrigger
+        className={cn(
+          value !== 'none' && 'text-amber-600 dark:text-amber-300',
+          triggerClassName,
+        )}
+        aria-label="Wormhole EOL stage"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="p-0.5">
+        {EOL_STAGES.map((s) => (
+          <SelectItem className="py-1" key={s} value={s}>
+            {EOL_STAGE_LABELS[s]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -329,6 +427,7 @@ const signatureColumns = [
   columnHelper.display({ id: 'type', header: 'Type', cell: TypeColumnCell }),
   columnHelper.display({ id: 'description', header: 'Description', cell: DescriptionCell }),
   columnHelper.display({ id: 'leadsTo', header: 'Leads to', cell: LeadsToCell }),
+  columnHelper.display({ id: 'eol', header: 'EOL', cell: EolCell }),
   columnHelper.accessor('createdAt', { header: 'Created', enableSorting: true, cell: CreatedCell }),
   columnHelper.accessor('updatedAt', { header: 'Updated', enableSorting: true, cell: UpdatedCell }),
   columnHelper.display({ id: 'actions', header: '', cell: ActionsCell }),
@@ -571,6 +670,20 @@ function SignaturePanelBody({
     [metaByTypeId, onConnectionPatch],
   );
 
+  /**
+   * When a WH sig with an EOL stage set is linked to its connection, carry that
+   * stage onto the connection — the connection is then authoritative. Only
+   * applies a non-`none` stage; a `none` sig leaves the connection's EOL alone so
+   * a stage set from the connection itself isn't cleared on link.
+   */
+  const syncConnectionEol = useCallback(
+    (stage: EolStage, connectionId: string | null) => {
+      if (stage === 'none' || connectionId == null) return;
+      onConnectionPatch(connectionId, { eolStage: stage });
+    },
+    [onConnectionPatch],
+  );
+
   const [sorting, setSorting] = useState<SortingState>([{ id: 'sigId', desc: false }]);
 
   const table = useReactTable({
@@ -587,7 +700,9 @@ function SignaturePanelBody({
       systems,
       onPatch,
       onDelete,
+      onConnectionPatch,
       syncConnectionSize,
+      syncConnectionEol,
       metaByTypeId,
       assignedConnectionIds,
     } satisfies SignatureTableMeta,
@@ -598,6 +713,7 @@ function SignaturePanelBody({
   const [draftName, setDraftName] = useState('');
   const [draftTypeId, setDraftTypeId] = useState<number | null>(null);
   const [draftConnectionId, setDraftConnectionId] = useState<string | null>(null);
+  const [draftEolStage, setDraftEolStage] = useState<EolStage>('none');
 
   function submit() {
     if (draftSigId.trim().length === 0) return;
@@ -607,16 +723,21 @@ function SignaturePanelBody({
       sigId: draftSigId.trim().toUpperCase(),
       groupKey: draftGroupKey,
       typeId: isWh ? draftTypeId : null,
+      eolStage: isWh ? draftEolStage : 'none',
       name: isWh ? null : (draftName.trim() || null),
       mapConnectionId: isWh ? draftConnectionId : null,
       expiresAt: defaultExpiry(),
     });
-    if (isWh) syncConnectionSize(draftTypeId, draftConnectionId);
+    if (isWh) {
+      syncConnectionSize(draftTypeId, draftConnectionId);
+      syncConnectionEol(draftEolStage, draftConnectionId);
+    }
     setDraftSigId('');
     setDraftGroupKey(null);
     setDraftName('');
     setDraftTypeId(null);
     setDraftConnectionId(null);
+    setDraftEolStage('none');
   }
 
   return (
@@ -655,7 +776,7 @@ function SignaturePanelBody({
           <tbody>
             {table.getRowModel().rows.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-2 py-3 text-center text-xs text-muted-foreground">
+                <td colSpan={11} className="px-2 py-3 text-center text-xs text-muted-foreground">
                   {rows.length > 0 ? 'No signatures match the filter.' : 'No signatures.'}
                 </td>
               </tr>
@@ -700,6 +821,7 @@ function SignaturePanelBody({
               setDraftTypeId(null);
               setDraftName('');
               setDraftConnectionId(null);
+              setDraftEolStage('none');
             }}
           />
         </div>
@@ -737,6 +859,12 @@ function SignaturePanelBody({
               }
               excludeIds={assignedConnectionIds}
             />
+          </div>
+        )}
+        {draftGroupKey === 'wormhole' && (
+          <div className="flex w-24 flex-col gap-1">
+            <span className="text-[11px] text-muted-foreground">EOL</span>
+            <EolStageSelect value={draftEolStage} onValueChange={setDraftEolStage} />
           </div>
         )}
         <Button type="button" onClick={submit} disabled={draftSigId.trim().length === 0}>

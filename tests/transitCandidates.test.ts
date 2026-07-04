@@ -11,6 +11,7 @@ function sig(overrides: Partial<MapSignature>): MapSignature {
     groupKey: 'wormhole',
     classKind: null,
     typeId: null,
+    eolStage: 'none',
     wormholeCode: null,
     name: null,
     description: null,

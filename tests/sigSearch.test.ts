@@ -12,6 +12,7 @@ function makeSig(
     groupKey: null,
     classKind: null,
     typeId: null,
+    eolStage: 'none',
     wormholeCode: null,
     name: null,
     description: null,

@@ -117,6 +117,8 @@ export type MapSignature = {
   classKind: SignatureClassKind | null;
   /** `universe_type.id`. Only meaningful when `groupKey === 'wormhole'` (points to a `universe_wormhole` row); otherwise null. */
   typeId: number | null;
+  /** Pre-jump EOL stage for a wormhole sig; transferred to the connection's `eolStage` on populate. Shares the connection's three-stage enum. */
+  eolStage: EolStage;
   /** Display-only wormhole code (e.g. "B274"), resolved server-side from `universe_wormhole.name`. Null when `typeId` is null or not a wormhole. */
   wormholeCode: string | null;
   /** For wormhole sigs: redundant mirror of `wormholeCode`. For cosmic sigs: the user-typed EVE site name string (e.g. "Forgotten Perimeter Habitation Coils"). Null when unknown. */

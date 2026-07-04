@@ -180,6 +180,9 @@ export function TransitSignaturePrompt({
               // (e.g. B274 → M); skip when the type is unset or can't be inferred.
               const band = sig.typeId == null ? null : jumpMassByTypeId.get(sig.typeId) ?? null;
               if (band != null) onConnectionPatch(prompt.connectionId, { jumpMassClass: band });
+              // Carry a pre-jump EOL stage onto the connection it resolved to.
+              if (sig.eolStage !== 'none')
+                onConnectionPatch(prompt.connectionId, { eolStage: sig.eolStage });
               dismiss();
             }}
           >

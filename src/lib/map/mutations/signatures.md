@@ -15,7 +15,7 @@ Inserts an `ap_map_signature` row and emits `signature.create` with the full bod
 - `input.sigId` — in-game 3-char scan id (e.g. `"ABC"`).
 - `input.expiresAt` — when the sig ages out (set by the caller, typically `now + SIGNATURE_DEFAULT_TTL_MS`).
 - `input.tx` *(optional)* — outer Drizzle transaction (see `bulkSignatures.ts`). Forwarded to `commitMapEvent`.
-- remaining fields — `groupKey`, `classKind` (`signature`/`anomaly`, paste-derived), `typeId`, `name`, `description` (all optional).
+- remaining fields — `groupKey`, `classKind` (`signature`/`anomaly`, paste-derived), `typeId`, `eolStage` (pre-jump EOL stage `none`/`eol`/`critical`, default `none`), `name`, `description` (all optional).
 
 ---
 
