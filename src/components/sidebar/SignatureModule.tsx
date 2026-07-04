@@ -625,6 +625,15 @@ function SignaturePanelBody({
     [rows],
   );
 
+  const sigStats = useMemo(
+    () => ({
+      total: rows.length,
+      unscanned: rows.filter((s) => s.classKind !== 'anomaly' && !isFullyScanned(s)).length,
+      wormholes: rows.filter((s) => s.groupKey === 'wormhole').length,
+    }),
+    [rows],
+  );
+
   const [persistedFilter] = useState(loadPersistedFilter);
   const [groupFilter, setGroupFilter] = useState<Set<SignatureGroupKey | null>>(
     () => new Set(persistedFilter.groups),
@@ -743,6 +752,7 @@ function SignaturePanelBody({
         onGroupFilterChange={setGroupFilter}
         scanFilter={scanFilter}
         onScanFilterChange={setScanFilter}
+        stats={sigStats}
       />
       <div className="min-h-0 flex-1 overflow-y-auto rounded-md ring-1 ring-foreground/10">
         <table className="w-full text-sm [&_[data-slot=input]]:h-6 [&_[data-slot=select-trigger]]:h-6">
@@ -940,11 +950,13 @@ function SignatureFilterBar({
   onGroupFilterChange,
   scanFilter,
   onScanFilterChange,
+  stats,
 }: {
   groupFilter: Set<SignatureGroupKey | null>;
   onGroupFilterChange: (next: Set<SignatureGroupKey | null>) => void;
   scanFilter: ScanFilter;
   onScanFilterChange: (next: ScanFilter) => void;
+  stats: { total: number; unscanned: number; wormholes: number };
 }) {
   function toggleGroup(key: SignatureGroupKey | null) {
     const next = new Set(groupFilter);
@@ -987,15 +999,28 @@ function SignatureFilterBar({
           Unknown
         </FilterToggle>
       </div>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className={cn('h-6 px-2 text-xs', scanStyle[scanFilter].className)}
-        onClick={cycleScanFilter}
-      >
-        {scanStyle[scanFilter].label}
-      </Button>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">
+          {stats.total} signature{stats.total === 1 ? '' : 's'}
+          <span className="mx-1.5 opacity-40">·</span>
+          {stats.unscanned} unscanned
+          {stats.wormholes > 0 && (
+            <>
+              <span className="mx-1.5 opacity-40">·</span>
+              {stats.wormholes} wormhole{stats.wormholes === 1 ? '' : 's'}
+            </>
+          )}
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className={cn('h-6 px-2 text-xs', scanStyle[scanFilter].className)}
+          onClick={cycleScanFilter}
+        >
+          {scanStyle[scanFilter].label}
+        </Button>
+      </div>
     </div>
   );
 }
