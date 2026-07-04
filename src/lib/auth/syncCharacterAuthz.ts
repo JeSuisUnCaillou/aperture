@@ -19,9 +19,11 @@ import {
 } from '@/lib/esi/client';
 import {
   allianceSchema,
+  characterPublicSchema,
   characterRolesSchema,
   characterTitlesSchema,
   type EsiAlliance,
+  type EsiCharacterPublic,
   type EsiCharacterRoles,
   type EsiCharacterTitles,
 } from '@/lib/esi/decoders';
@@ -88,12 +90,15 @@ export async function syncCharacterAuthz(
 ): Promise<SyncCharacterAuthzResult> {
   let affiliations: Map<bigint, CharacterAffiliation>;
   let roles: EsiCharacterRoles, titles: EsiCharacterTitles;
+  let profile: EsiCharacterPublic;
   let alliance: EsiAlliance | null = null;
   try {
     // Affiliation (corp/alliance) comes from the bulk affiliation endpoint
     // (~1h cache) rather than the public profile (~24h) so corp moves surface
-    // within the hour.
-    [affiliations, roles, titles] = await Promise.all([
+    // within the hour. The public profile is fetched too, but only for `name`:
+    // it is the authoritative source for a CCP-performed rename, which the SSO
+    // JWT `name` claim (the login-time source) can lag indefinitely.
+    [affiliations, roles, titles, profile] = await Promise.all([
       fetchAffiliations([characterId]),
       esiCall('getCharacterRoles', {
         schema: characterRolesSchema,
@@ -104,6 +109,10 @@ export async function syncCharacterAuthz(
         schema: characterTitlesSchema,
         pathParams: { character_id: characterId },
         characterId,
+      }),
+      esiCall('getCharacter', {
+        schema: characterPublicSchema,
+        pathParams: { character_id: characterId },
       }),
     ]);
     // Alliance lookup depends on the just-resolved affiliation, so it follows
@@ -200,9 +209,12 @@ export async function syncCharacterAuthz(
     // 2. Update the character row. `authz_level` is the recomputed cache from
     //    `resolveAuthzLevel` — written verbatim, no preserve-hack. `is_director`
     //    is the raw ESI Director bit, carrying corp/alliance map authority.
+    //    `name` tracks ESI's public profile so a CCP rename self-heals here
+    //    rather than waiting on a fresh login's (indefinitely-stale) SSO claim.
     await tx
       .update(apCharacter)
       .set({
+        name: profile.name,
         corporationId,
         allianceId,
         isDirector,
