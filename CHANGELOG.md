@@ -1,5 +1,47 @@
 # Changelog
 
+## v1.0.0-rc.12
+
+This release introduces tabbed panels - drag any panel onto another to stack them as tabs, reorder them, or tear one back out into its own cell. Wormhole details now show in hover-open popovers on both live connections and system statics, and the signature panel gains an EOL-stage control, a signature count and zebra striping. Under the hood, a batch of scaling work removes three growth ceilings - unbounded job-run history, accumulating zombie location-polls, and the shared-bucket killmail rate limit - that quietly degraded every deployment as it accrued characters and viewers.
+
+### New features
+
+- **Tabbed panels** - drag a panel's tab or title onto another panel's header to stack them as tabs in one cell, reorder tabs within a header, or drag a tab out into open grid space to split it back into its own cell. The layout model is group-aware per breakpoint and legacy layouts migrate transparently. *(MonoliYoda)*
+- **Connection detail popover** - hovering a connection's badge opens a card with the source wormhole's type, size class, leads-to class, total stable mass, mass logged so far (as a share of the total), max jump mass, max lifetime, and a live EOL countdown for EOL-flagged holes. This also fixes the old on-edge label that doubled up with the badge and read the wrong time left. *(MonoliYoda)*
+- **Static wormhole detail on hover** - hovering a system node's static label opens the same detail card, carrying the static's data (code, size, leads-to class, total mass, max jump, max lifetime). *(MonoliYoda)*
+- **EOL stage control on signatures** - a wormhole signature can now carry a pre-jump EOL stage set from a three-stage picker in the signatures panel; the stage carries onto the connection when it populates, and once bound the connection's EOL is authoritative and editable from both places. *(MonoliYoda)*
+
+### Improvements
+
+- **Periodic refresh of on-map intel and stats** - system data for the whole on-map set is re-pulled every ~5 min so incursion/sov/FW decorators and the intel and stats modules catch mid-session drift without a reload; polling pauses while the tab is hidden. *(MonoliYoda)*
+- **Signature count** shown in the signature panel. *(Ionis en Gravonere)*
+- **Zebra-striped rows** on the signatures and signature-search panels for easier scanning. *(MonoliYoda)*
+- **"Leads to" and "EOL" columns left empty for non-wormhole signatures**, rather than showing placeholder values. *(MonoliYoda)*
+- **Route-path systems coloured by security status** rather than system type, so a plotted route reads by sec at a glance. *(Ionis en Gravonere)*
+- **Who locked a system** is now shown next to the locked checkbox in the inspector, so an abandoned locked system's owner is visible without director-only audit access. *(MonoliYoda)*
+- **DOTLAN pop-out links to the region map view** instead of the single-system view. *(MonoliYoda)*
+- **Long ship names truncate** in the pilot roster table instead of stretching the column. *(MonoliYoda)*
+- **Softened text contrast** and toned-down missing-signature borders. *(MonoliYoda)*
+- **Manual-move gap decoupled from the auto-placement gap**, so nudging a system by hand no longer inherits the wider auto-placement spacing. *(MonoliYoda)*
+- **Signature TTL column removed** from the signatures panel (it showed the same value for every row), and the signature purge shortened from 72h to 48h - the maximum a wormhole can stay open. *(MonoliYoda)*
+
+### Fixes
+
+- **Month and year activity stats no longer read zero early in a new month** - the rollup grouped by ISO week and filed a month-straddling week entirely under the earlier month, so a new month showed nothing for every pilot until its first Monday. The rollup is now daily-grain, making month and year boundaries calendar-exact; the first refresh back-corrects all history. *(MonoliYoda)*
+- **HTML entities in ESI ship names are decoded**, so names render correctly instead of showing raw entity codes. *(MonoliYoda)*
+
+### Scaling & reliability
+
+- **Bounded `ap_job_run` growth** - the job-run log had grown to 91% of the database, driven almost entirely by one location-poll row per character every 5s. Successful high-frequency rows are now weight-sampled (~1-in-N, every failure still recorded, aggregate rates preserved), and the table is repartitioned daily with a 14-day rolloff. *(MonoliYoda)*
+- **Fixed zombie location-poll accumulation** - expected ESI-outage ticks (breaker-open, downtime, post-refresh 401) now re-enqueue cleanly instead of minting permanently-failed NULL-key jobs the boot re-arm never reaped; legacy zombies are reaped on boot and excluded from the backlog gauge. *(MonoliYoda)*
+- **Persistent killmail cache** - immutable ESI killmail bodies (~28k/day on prod, all against the shared unauthenticated rate-limit bucket) are now cached once in `universe_killmail`, so repeat killboard opens issue zero ESI calls; a daily reaper trims by kill time. *(MonoliYoda)*
+- **Per-table row-count metric** (`db_table_rows`) exposed on `/api/metrics` from planner estimates, so table growth is graphable and alertable. *(MonoliYoda)*
+
+### Contributors
+
+- **MonoliYoda** - tabbed panels, connection and static detail popovers, signature EOL-stage control, periodic on-map refresh, lock-holder display, scaling-ceiling removals (job-run, zombie polls, killmail cache), and assorted polish
+- **Ionis en Gravonere** - signature count, route-path security colouring
+
 ## v1.0.0-rc.11
 
 This release adds an in-header Eve Time clock, turns signature search into a compact panel with anomaly/signature filtering, lets you send a system straight to the route planner from its context menu, and sharpens the D-Scan overlay comparison.
