@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MapCanvas } from '@/components/map/MapCanvas';
+import { CurrentMapScopeSync } from '@/components/map/CurrentMapScopeSync';
 import { loadMapForView, loadMapSettings } from '@/lib/map/loadMap';
 import { canManageMap } from '@/lib/auth/rights';
 import { loadRouteConfig } from '@/lib/map/routeConfig';
@@ -88,22 +89,25 @@ export default async function MapPage({ params }: { params: Promise<{ slug?: str
   }
 
   return (
-    <MapCanvas
-      data={data}
-      stats={stats}
-      intel={intel}
-      structures={structures}
-      settings={settings}
-      canManage={canManage}
-      travelAnimation={travelAnimation}
-      signatureIndicators={signatureIndicators}
-      viewerCharacterIds={viewerCharacterIds}
-      viewerCharacters={viewerCharacters}
-      mainCharacterId={mainCharacterId == null ? null : Number(mainCharacterId)}
-      routePrefs={routeConfig.prefs}
-      routeDestinations={routeConfig.destinations}
-      mapLayout={mapLayout}
-    />
+    <>
+      <CurrentMapScopeSync scope={data.map.type} />
+      <MapCanvas
+        data={data}
+        stats={stats}
+        intel={intel}
+        structures={structures}
+        settings={settings}
+        canManage={canManage}
+        travelAnimation={travelAnimation}
+        signatureIndicators={signatureIndicators}
+        viewerCharacterIds={viewerCharacterIds}
+        viewerCharacters={viewerCharacters}
+        mainCharacterId={mainCharacterId == null ? null : Number(mainCharacterId)}
+        routePrefs={routeConfig.prefs}
+        routeDestinations={routeConfig.destinations}
+        mapLayout={mapLayout}
+      />
+    </>
   );
 }
 

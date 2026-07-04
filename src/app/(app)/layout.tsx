@@ -12,6 +12,7 @@ import {
 import { AppHeader } from '@/components/chrome/AppHeader';
 import { AppFooter } from '@/components/chrome/AppFooter';
 import { RealtimeProvider } from '@/lib/realtime/useRealtime';
+import { CurrentMapScopeProvider } from '@/components/chrome/CurrentMapScopeContext';
 import { RealtimeStatusBanner } from '@/components/RealtimeStatusBanner';
 import { LowContrastController } from '@/components/LowContrastController';
 import { ClientErrorReporter } from '@/components/ClientErrorReporter';
@@ -28,23 +29,25 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <RealtimeProvider>
-      <LowContrastController />
-      <ClientErrorReporter />
-      <div className="flex min-h-screen flex-col">
-        <RealtimeStatusBanner />
-        <AppHeader
-          active={{ id: active.id.toString(), name: active.name }}
-          characters={characters}
-          mainCharacterId={mainCharacterId}
-          travelAnimation={travelAnimation}
-          signatureIndicators={signatureIndicators}
-        />
-        <main className="w-full flex-1 px-4 py-3">
-          <ClientErrorBoundary>{children}</ClientErrorBoundary>
-        </main>
-        <AppFooter />
-        <Toaster />
-      </div>
+      <CurrentMapScopeProvider>
+        <LowContrastController />
+        <ClientErrorReporter />
+        <div className="flex min-h-screen flex-col">
+          <RealtimeStatusBanner />
+          <AppHeader
+            active={{ id: active.id.toString(), name: active.name }}
+            characters={characters}
+            mainCharacterId={mainCharacterId}
+            travelAnimation={travelAnimation}
+            signatureIndicators={signatureIndicators}
+          />
+          <main className="w-full flex-1 px-4 py-3">
+            <ClientErrorBoundary>{children}</ClientErrorBoundary>
+          </main>
+          <AppFooter />
+          <Toaster />
+        </div>
+      </CurrentMapScopeProvider>
     </RealtimeProvider>
   );
 }

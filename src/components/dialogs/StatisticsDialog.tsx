@@ -28,9 +28,11 @@ import type { ActivityStatPeriod, ActivityStatScope, ActivityStatsResponse } fro
 export function StatisticsDialog({
   open,
   onOpenChange,
+  defaultScope,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultScope?: ActivityStatScope | null;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -41,7 +43,7 @@ export function StatisticsDialog({
             Mapping activity by pilot, rolled up to account mains.
           </DialogDescription>
         </DialogHeader>
-        {open ? <StatisticsBody /> : null}
+        {open ? <StatisticsBody defaultScope={defaultScope ?? 'private'} /> : null}
       </DialogContent>
     </Dialog>
   );
@@ -69,8 +71,8 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function StatisticsBody() {
-  const [scope, setScope] = useState<ActivityStatScope>('private');
+function StatisticsBody({ defaultScope }: { defaultScope: ActivityStatScope }) {
+  const [scope, setScope] = useState<ActivityStatScope>(defaultScope);
   const [period, setPeriod] = useState<ActivityStatPeriod>('week');
   const [anchor, setAnchor] = useState<string>(todayIso);
   const [availableScopes, setAvailableScopes] = useState<ActivityStatScope[]>(['private']);
@@ -89,7 +91,12 @@ function StatisticsBody() {
       .then((res) => res.json() as Promise<StatsApiResponse>)
       .then((json) => {
         if (!active) return;
-        if (json.availableScopes) setAvailableScopes(json.availableScopes);
+        if (json.availableScopes) {
+          setAvailableScopes(json.availableScopes);
+          // Viewing a corp/alliance map the account can't rank in (e.g. an admin
+          // viewing another corp's map) falls back to the always-present private tab.
+          if (!json.availableScopes.includes(scope)) setScope('private');
+        }
         setResult({
           key: `${scope}|${period}|${anchor}`,
           data: json.ok ? json : null,

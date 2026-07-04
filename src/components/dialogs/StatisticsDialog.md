@@ -9,12 +9,14 @@
 |---|---|---|---|
 | open | boolean | yes | Controls dialog visibility |
 | onOpenChange | (open: boolean) => void | yes | Open-state setter |
+| defaultScope | ActivityStatScope \| null | no | Scope tab to open on; `null`/omitted opens on Private |
 
 ### Renders
 A dialog with: scope `Tabs` (only the account's qualifying Private/Corp/Alliance tabs), a week/month/year segmented control, a prev/label/next period navigator, and a `StatsTable` (or loading / empty / error text).
 
 ### Behaviour & Interactions
-- On open, resets to `scope=private`, `period=week`, `anchor=today` (live period).
+- On open, resets to `scope=defaultScope` (Private when unset), `period=week`, `anchor=today` (live period).
+- If the first response's `availableScopes` doesn't include the opened scope (account can't rank in that map's corp/alliance), scope falls back to Private.
 - A single effect fetches `GET /api/statistics?scope&period&anchor` on any of `[open, scope, period, anchor]`; in-flight requests are aborted via `AbortController`.
 - `availableScopes` comes back on every response (including 403/200) and drives which tabs render — private is always present for an active session.
 - Prev/Next set `anchor` to the server-returned `prevAnchor`/`nextAnchor`; Next disables when `hasNext` is false (already at the current period).
