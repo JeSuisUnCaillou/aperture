@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 /**
  * `getCharacter` → `get_characters_character_id`. Public character profile.
- * Reads `corporation_id` / `alliance_id` here to keep `ap_character`
- * affiliation columns in sync alongside the role/title resync.
+ * `syncCharacterAuthz` consumes `name` from here as the authoritative source for
+ * a CCP rename (the login-time SSO `name` claim can lag it indefinitely); corp/
+ * alliance come from the faster affiliation endpoint, not this profile.
  *
  * The swagger schema is wider (security_status, birthday, faction_id, …); only
  * the fields consumed are required, the rest are accepted permissively.

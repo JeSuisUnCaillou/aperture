@@ -3,8 +3,11 @@ import { z } from 'zod';
 import { apertureConfig } from '../../../aperture.config';
 import { db } from '@/db/client';
 import { apMap, apMapSystem } from '@/db/schema';
+import { getLogger } from '@/lib/log/logger';
 import type { SystemNotificationLoad } from '@/lib/realtime/protocol';
 import { zkbKillSchema, type ZkbKill } from './zkb';
+
+const jobLog = getLogger('job');
 
 /**
  * Server-side zKillboard live-feed consumer. A single
@@ -116,6 +119,17 @@ export function correlateKill(kill: ZkbKill, index: SystemIndex): SystemNotifica
 async function notify(load: SystemNotificationLoad): Promise<void> {
   const channel = `${apertureConfig.MAP_EVENT_NOTIFY_CHANNEL_PREFIX}${load.mapId}`;
   const envelope = JSON.stringify({ task: 'systemNotification', load });
+  // The flash bypasses `ap_map_event`, so this line is the only durable record
+  // of what triggered an underglow: compare `systemId` (the system we flashed)
+  // against the real system on `href` to catch a mis-correlated kill.
+  const killmail = load.kind === 'killmail' ? load.killmail : undefined;
+  jobLog.info('zkb.notify', {
+    kind: load.kind,
+    killmailId: killmail?.killmailId,
+    systemId: load.systemId,
+    mapId: load.mapId,
+    href: killmail?.href,
+  });
   await db.execute(sql`SELECT pg_notify(${channel}, ${envelope})`);
 }
 
@@ -141,7 +155,16 @@ function decodeKill(raw: unknown): ZkbKill | null {
       if (merged.success) return merged.data;
     }
   }
-  return flat.success ? flat.data : null;
+
+  // A system-less flat parse (returned above) is a valid kill we simply don't
+  // flash; reaching here means no shape matched at all — a feed-drift signal.
+  if (flat.success) return flat.data;
+  const idHint =
+    raw && typeof raw === 'object' ? (raw as { killmail_id?: unknown }).killmail_id : undefined;
+  jobLog.warn('zkb.decode_failed', {
+    killmailId: typeof idHint === 'number' ? idHint : undefined,
+  });
+  return null;
 }
 
 async function fetchJson(url: string, signal: AbortSignal): Promise<{ status: number; body: unknown }> {
@@ -197,7 +220,10 @@ export async function pollOnce(): Promise<PollResult> {
       const seq = cursor + 1;
       const { status, body } = await fetchJson(`${BASE}/${seq}.json`, signal);
       if (status === 404) break; // caught up — retry this seq next tick
-      if (status !== 200) break; // transient upstream error — try again next tick
+      if (status !== 200) {
+        jobLog.warn('zkb.fetch_error', { seq, status }); // transient upstream error
+        break; // try again next tick
+      }
       cursor = seq;
       state.cursor = seq;
       processed++;
@@ -225,7 +251,7 @@ async function loop(): Promise<void> {
     await pollOnce();
     state.backoffAttempts = 0;
     scheduleNext(apertureConfig.ZKB_FEED_POLL_MS);
-  } catch {
+  } catch (err) {
     // Never let a bad tick kill the loop — back off and try again. Backoff is
     // floored at the normal poll cadence and capped at the WS reconnect ceiling.
     const backoff = Math.min(
@@ -233,7 +259,17 @@ async function loop(): Promise<void> {
       apertureConfig.WS_RECONNECT_BASE_MS * 2 ** state.backoffAttempts,
     );
     state.backoffAttempts++;
-    scheduleNext(Math.max(apertureConfig.ZKB_FEED_POLL_MS, backoff));
+    const delay = Math.max(apertureConfig.ZKB_FEED_POLL_MS, backoff);
+    if (err instanceof ZkbFeedRateLimitError) {
+      jobLog.warn('zkb.rate_limited', { attempt: state.backoffAttempts, retryMs: delay });
+    } else {
+      jobLog.warn('zkb.tick_failed', {
+        attempt: state.backoffAttempts,
+        retryMs: delay,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    scheduleNext(delay);
   }
 }
 
