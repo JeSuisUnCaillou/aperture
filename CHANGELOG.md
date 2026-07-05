@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.0.0-rc.13
+
+A small maintenance release on top of rc.12: renamed characters now pick up their new name without a re-login, and the zKillboard feed gained operational logging to make spurious system-kill flashes traceable.
+
+### Fixes
+
+- **Renamed characters refresh their name automatically** - a character's name was only ever copied from the login-time SSO token, which CCP does not refresh after a support-performed rename, so a renamed character kept showing the old name even across re-login. The name is now re-read from ESI's public profile on each authz resync, self-healing within the hour without a fresh login. *(MonoliYoda)*
+
+### Scaling & reliability
+
+- **zKillboard feed logging** - the kill feed now logs its fan-out and its operational failures (tick, fetch, decode), so spurious system-kill "underglow" flashes can be traced to their source. *(MonoliYoda)*
+
+### Contributors
+
+- **MonoliYoda** - character name refresh, zKillboard feed logging
+
 ## v1.0.0-rc.12
 
 This release introduces tabbed panels - drag any panel onto another to stack them as tabs, reorder them, or tear one back out into its own cell. Wormhole details now show in hover-open popovers on both live connections and system statics, and the signature panel gains an EOL-stage control, a signature count and zebra striping. Under the hood, a batch of scaling work removes three growth ceilings - unbounded job-run history, accumulating zombie location-polls, and the shared-bucket killmail rate limit - that quietly degraded every deployment as it accrued characters and viewers.
