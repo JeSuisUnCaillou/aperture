@@ -3,8 +3,11 @@ import { z } from 'zod';
 import { apertureConfig } from '../../../aperture.config';
 import { db } from '@/db/client';
 import { apMap, apMapSystem } from '@/db/schema';
+import { getLogger } from '@/lib/log/logger';
 import type { SystemNotificationLoad } from '@/lib/realtime/protocol';
 import { zkbKillSchema, type ZkbKill } from './zkb';
+
+const jobLog = getLogger('job');
 
 /**
  * Server-side zKillboard live-feed consumer. A single
@@ -116,6 +119,17 @@ export function correlateKill(kill: ZkbKill, index: SystemIndex): SystemNotifica
 async function notify(load: SystemNotificationLoad): Promise<void> {
   const channel = `${apertureConfig.MAP_EVENT_NOTIFY_CHANNEL_PREFIX}${load.mapId}`;
   const envelope = JSON.stringify({ task: 'systemNotification', load });
+  // The flash bypasses `ap_map_event`, so this line is the only durable record
+  // of what triggered an underglow: compare `systemId` (the system we flashed)
+  // against the real system on `href` to catch a mis-correlated kill.
+  const killmail = load.kind === 'killmail' ? load.killmail : undefined;
+  jobLog.info('zkb.notify', {
+    kind: load.kind,
+    killmailId: killmail?.killmailId,
+    systemId: load.systemId,
+    mapId: load.mapId,
+    href: killmail?.href,
+  });
   await db.execute(sql`SELECT pg_notify(${channel}, ${envelope})`);
 }
 
