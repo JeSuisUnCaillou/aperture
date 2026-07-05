@@ -34,6 +34,7 @@ Test seam — resets module singleton state (cursor, index, timers) between case
 - **Backoff:** a throwing tick (network/timeout, 429) never kills the loop — it backs off (`WS_RECONNECT_BASE_MS`·2^n capped at `WS_RECONNECT_MAX_MS`, floored at `ZKB_FEED_POLL_MS`) and retries. A clean tick resets backoff.
 - **404 = caught up:** the cursor is not advanced past a 404, so that sequence is retried next tick.
 - **Fan-out log:** every `notify` emits a `zkb.notify` info line (`kind`, `killmailId`, `systemId`, `mapId`, `href`) via `getLogger('job')`. Because the flash bypasses `ap_map_event`, this is the only durable trace of what triggered an underglow — the `systemId` flashed can be checked against the real system on `href`.
+- **Operational warns** (all via `getLogger('job')`, stdout only): `zkb.tick_failed` / `zkb.rate_limited` when a poll tick throws (with attempt + retry delay), `zkb.fetch_error` on a non-200/non-404 sequence fetch, and `zkb.decode_failed` when a feed entry matches no known killmail shape (drift signal).
 - **Defensive decode:** accepts the R2Z2 ephemeral shape (killmail nested under `esi`, with `zkb` alongside at the top level), the flat shape (ESI fields at the top level), and the older nested `{ killmail, zkb }`; an unrecognised shape degrades to "no notification", never a crash.
 - Each fetch carries `INTEGRATION_USER_AGENT` (blank UA → zKB 403) and an `INTEGRATION_REQUEST_TIMEOUT_MS` timeout combined with the loop's stop signal.
 
