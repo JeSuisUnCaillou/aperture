@@ -131,6 +131,7 @@ export function MapContextMenu({
   onAddNoteAt,
   onNotePatch,
   onNoteRemove,
+  hasSelection,
   onClearSelection,
 }: {
   target: MapContextMenuTarget | null;
@@ -163,7 +164,10 @@ export function MapContextMenu({
   onAddNoteAt: (clientX: number, clientY: number) => void;
   onNotePatch: (id: string, patch: UpdateNoteBody) => void;
   onNoteRemove: (id: string) => void;
-  /** Pane action: clear the current system selection. */
+  /** Whether anything (system(s), connection, or note) is currently selected —
+      covers selections `selectedSystemIds` doesn't (connection / note primary). */
+  hasSelection: boolean;
+  /** Pane action: clear the current selection (any kind). */
   onClearSelection: () => void;
 }) {
   // A zero-size virtual element at the cursor point; recreated per render so the
@@ -233,6 +237,7 @@ export function MapContextMenu({
               onAddNoteAt,
               onNotePatch,
               onNoteRemove,
+              hasSelection,
               onClearSelection,
             })}
           </MenuPrimitive.Popup>
@@ -263,6 +268,7 @@ function renderItems({
   onAddNoteAt,
   onNotePatch,
   onNoteRemove,
+  hasSelection,
   onClearSelection,
 }: {
   target: MapContextMenuTarget | null;
@@ -285,6 +291,7 @@ function renderItems({
   onAddNoteAt: (clientX: number, clientY: number) => void;
   onNotePatch: (id: string, patch: UpdateNoteBody) => void;
   onNoteRemove: (id: string) => void;
+  hasSelection: boolean;
   onClearSelection: () => void;
 }) {
   if (!target) return null;
@@ -416,7 +423,7 @@ function renderItems({
                 Delete disconnected
               </MenuItem>
             ))}
-          {selectedSystemIds.size > 0 && (
+          {hasSelection && (
             <MenuItem
               icon={<X className="size-3.5" />}
               onClick={() => {
@@ -424,7 +431,7 @@ function renderItems({
                 onClose();
               }}
             >
-              Unselect current system
+              Clear selection
             </MenuItem>
           )}
         </>

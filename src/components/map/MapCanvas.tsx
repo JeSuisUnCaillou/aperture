@@ -691,14 +691,8 @@ export function MapCanvas({
   // ---- xyflow → server callbacks -----------------------------------------
   const mapId = viewData.map.id;
 
-  // Node `selected` is fully derived from app state (`selectedSystemIds` /
-  // `selected`) via the sync block below — never from xyflow's own selection
-  // store. Drop xyflow's internal `select` changes (e.g. the pane click's
-  // built-in "unselect all") so a background click can't wipe the outline out
-  // from under state that still considers the system selected.
   const onNodesChange = useCallback((changes: NodeChange<CanvasNode>[]) => {
-    const filtered_changes = changes.filter((c) => c.type !== 'select');
-    setNodes((nds) => applyNodeChanges(filtered_changes, nds));
+    setNodes((nds) => applyNodeChanges(changes, nds));
   }, []);
 
   // Commit the post-drag positions of every selected system. xyflow drags all
@@ -976,6 +970,18 @@ export function MapCanvas({
     setSelectedSystemIds(new Set());
   }, []);
 
+  // A background click must NOT clear the logical selection (#144), but
+  // xyflow's built-in pane-click deselect still wipes the store's `selected`
+  // flags via onNodesChange in the same event. Bump the sync keys by reference
+  // so the render-time reconcile re-asserts the controlled flags from
+  // `selectedSystemIds` / `selected` after both updates settle; the logical
+  // selection itself is left intact. (Selection can't be fully controlled by
+  // filtering `select` changes out of onNodesChange instead — box-select group
+  // drag and pure-note multi-drag read xyflow's own store flags.)
+  const onPaneClick = useCallback(() => {
+    setSelectedSystemIds((ids) => (ids.size > 0 ? new Set(ids) : ids));
+    setSelected((sel) => (sel ? { ...sel } : sel));
+  }, []);
 
   // Right-click handlers. Each suppresses the native browser menu and stores the
   // cursor point + target; selection is intentionally left untouched.
@@ -1653,6 +1659,7 @@ export function MapCanvas({
               edgeTypes={edgeTypes}
               onNodeClick={onNodeClick}
               onEdgeClick={onEdgeClick}
+              onPaneClick={onPaneClick}
               onNodeContextMenu={onNodeContextMenu}
               onEdgeContextMenu={onEdgeContextMenu}
               onPaneContextMenu={onPaneContextMenu}
@@ -1707,6 +1714,7 @@ export function MapCanvas({
               onAddNoteAt={onAddNoteAt}
               onNotePatch={onNotePatch}
               onNoteRemove={onNoteRemove}
+              hasSelection={selected !== null || selectedSystemIds.size > 0}
               onClearSelection={() => {
                 setSelected(null);
                 setSelectedSystemIds(new Set());

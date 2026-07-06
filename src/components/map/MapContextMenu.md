@@ -27,7 +27,8 @@
 | onAddNoteAt | (clientX: number, clientY: number) => void | yes | Pane action: create a note at the clicked client point. |
 | onNotePatch | (id: string, patch: UpdateNoteBody) => void | yes | Commits a note field change (severity / locked). |
 | onNoteRemove | (id: string) => void | yes | Deletes the note (hard). |
-| onClearSelection | () => void | yes | Pane action: clear the current system selection. |
+| hasSelection | boolean | yes | Whether anything (system(s), connection, or note) is selected — gates the pane "Clear selection" item; covers selections `selectedSystemIds` doesn't. |
+| onClearSelection | () => void | yes | Pane action: clear the current selection (any kind). |
 
 ### Renders
 A Base UI menu popup anchored to the cursor point, with per-kind items:
@@ -36,7 +37,7 @@ A Base UI menu popup anchored to the cursor point, with per-kind items:
 - **Locked-system delete guard (UI mirror of the server guard).** A locked system can't be removed (server rejects it — issue #157), so every delete entry computes the locked subset client-side and greys out rather than failing on the round-trip, via the shared `DisabledHintItem` (a two-line non-interactive row whose muted second line is `formatLockedHint(names)`, naming the locked system(s)). Specifically: a lone locked `Remove from map` greys with `<name> is locked — unlock it to delete`; a multi-selection `Remove from map` removes only the deletable systems, shows `Remove <deletableCount> from map` with a trailing `(<n> locked)` note, and greys entirely when nothing is deletable; `Delete subchain` (both the Home-anchored item and each no-Home `Keep <label>` option) greys when its resolved `computeSubchain` set traps a locked system; the pane `Delete disconnected` greys when the `computeDisconnected` set contains a locked system. The deletable counts/sets exclude the Home as well as locked systems, matching the floating "Remove N" button.
 - **connection** — `Mass ▸` (`WH_MASSES` via `WH_MASS_LABELS`), `Jump mass ▸` (`unknown` + `WH_JUMP_MASSES`), `Type ▸` (`CONNECTION_SCOPES`), `EOL ▸` (`EOL_STAGES` via `EOL_STAGE_LABELS`) radio submenus; `Preserve mass` / `Rolling` / `Static` checkboxes (`Static` designates the link as the source system's static — drives the ABC home-static exemption); separator; destructive `Delete connection`.
 - **note** — `Severity ▸` radio submenu (`NOTE_SEVERITIES` via `NOTE_SEVERITY_LABELS`); `Locked` checkbox; separator; destructive `Delete note`. The Delete entry greys (via `DisabledHintItem`, hint "Unlock the note to delete it") when the note is locked — locking protects a note from both dragging and deletion (the server has no locked-delete guard, so this is a client-side protection mirroring the inspector's disabled Remove).
-- **pane** — `Add system`; `Add note here` (StickyNote icon → `onAddNoteAt`); a destructive `Delete disconnected` (Unlink icon) shown only when a Home is set **and** `computeDisconnected` finds ≥1 system cut off from it (greyed via `DisabledHintItem` when any disconnected system is locked); then `Unselect current system` (X icon → `onClearSelection`) shown only when `selectedSystemIds.size > 0`.
+- **pane** — `Add system`; `Add note here` (StickyNote icon → `onAddNoteAt`); a destructive `Delete disconnected` (Unlink icon) shown only when a Home is set **and** `computeDisconnected` finds ≥1 system cut off from it (greyed via `DisabledHintItem` when any disconnected system is locked); then `Clear selection` (X icon → `onClearSelection`) shown only when `hasSelection`.
 
 If the target id no longer resolves (realtime removed it), a single disabled "… not found" item is shown.
 
