@@ -14,6 +14,13 @@ vi.mock('@/db/client', () => {
   return { db: { select, execute } };
 });
 
+// Capture warns so the seed-failure path can assert `zkb.seed_failed` fires.
+// Hoisted because `zkbFeed.ts` binds its logger at import time, before this line.
+const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+vi.mock('@/lib/log/logger', () => ({
+  getLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn, error: vi.fn(), fatal: vi.fn() }),
+}));
+
 import { db } from '@/db/client';
 import {
   __resetZkbFeedState,
@@ -102,6 +109,41 @@ describe('pollOnce', () => {
     expect(result.notified).toBe(1);
     expect(result.cursor).toBe(101); // not advanced past the 404'd 102
     expect(db.execute as Mock).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the cursor null on a failed seed and re-seeds live (never from 0) next tick', async () => {
+    const kill = { killmail_id: 555, solar_system_id: 30000142 };
+    let seedAttempt = 0;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/sequence.json')) {
+        // First seed 500s (body null → parse fails); the retry succeeds live.
+        return ++seedAttempt === 1 ? new Response('', { status: 500 }) : jsonResponse({ sequence: 100 });
+      }
+      if (url.endsWith('/101.json')) return jsonResponse(kill);
+      return new Response('', { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const failed = await pollOnce();
+    expect(failed).toEqual({ processed: 0, notified: 0, cursor: null });
+    expect(warn).toHaveBeenCalledWith('zkb.seed_failed', { status: 500 });
+
+    // Next tick must re-seed from the live sequence, NOT walk from a 0 cursor.
+    const seeded = await pollOnce();
+    expect(seeded).toEqual({ processed: 0, notified: 0, cursor: 100 });
+    expect(db.execute as Mock).not.toHaveBeenCalled();
+  });
+
+  it('leaves the cursor null when the seed body has the wrong shape', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/sequence.json')) return jsonResponse({ notSequence: true });
+      return new Response('', { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const result = await pollOnce();
+    expect(result).toEqual({ processed: 0, notified: 0, cursor: null });
+    expect(warn).toHaveBeenCalledWith('zkb.seed_failed', { status: 200 });
   });
 
   it('decodes and notifies the R2Z2 ephemeral shape (killmail nested under `esi`)', async () => {

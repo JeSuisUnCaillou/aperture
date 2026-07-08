@@ -207,9 +207,16 @@ export async function pollOnce(): Promise<PollResult> {
     await refreshIndexIfStale(signal);
 
     if (state.cursor === null) {
-      const { body } = await fetchJson(`${BASE}/sequence.json`, signal);
+      const { status, body } = await fetchJson(`${BASE}/sequence.json`, signal);
       const parsed = sequenceSchema.safeParse(body);
-      state.cursor = parsed.success ? parsed.data.sequence : 0;
+      if (!parsed.success) {
+        // Leave cursor null → re-seed next tick. Never fall back to 0: seq 1 has
+        // long since aged out of the ephemeral feed, so a 0 cursor 404s on the
+        // first walk step and wedges the feed dead (never re-seeds).
+        jobLog.warn('zkb.seed_failed', { status });
+        return { processed: 0, notified: 0, cursor: null };
+      }
+      state.cursor = parsed.data.sequence;
       return { processed: 0, notified: 0, cursor: state.cursor };
     }
 

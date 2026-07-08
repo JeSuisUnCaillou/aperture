@@ -16,7 +16,7 @@ Starts the loop. Idempotent — a second call while running is a no-op. Resets b
 Stops the loop: clears the pending tick timer and aborts any in-flight fetch. Called from `server.ts`'s shutdown handler before `stopWorker()`.
 
 ### pollOnce(): Promise<{ processed, notified, cursor }>
-One feed sweep. On the first call (cursor null) it seeds the cursor from `<base>/sequence.json` and returns without processing (live start). Thereafter it refreshes the active-system index when stale, then fetches `cursor+1 …` until a 404 / non-200 (stops the sweep, retried next tick) or the `ZKB_FEED_MAX_CATCHUP` cap; each killmail is decoded, correlated, and notified. Exported for the loop and tests.
+One feed sweep. On the first call (cursor null) it seeds the cursor from `<base>/sequence.json` and returns without processing (live start). A failed seed (non-200, or a body that isn't `{ sequence: number }`) leaves the cursor null so the next tick re-seeds — it never falls back to 0, which would 404 on the first walk step and wedge the feed dead. Thereafter it refreshes the active-system index when stale, then fetches `cursor+1 …` until a 404 / non-200 (stops the sweep, retried next tick) or the `ZKB_FEED_MAX_CATCHUP` cap; each killmail is decoded, correlated, and notified. Exported for the loop and tests.
 
 ### loadActiveSystemIndex(): Promise<SystemIndex>
 Builds the `solarSystemId → Set<mapId>` index from every `visible` system on a non-soft-deleted map (one join over `ap_map_system` × `ap_map`). Same predicate shape as the location-poll's tracked-map lookup.
@@ -34,7 +34,7 @@ Test seam — resets module singleton state (cursor, index, timers) between case
 - **Backoff:** a throwing tick (network/timeout, 429) never kills the loop — it backs off (`WS_RECONNECT_BASE_MS`·2^n capped at `WS_RECONNECT_MAX_MS`, floored at `ZKB_FEED_POLL_MS`) and retries. A clean tick resets backoff.
 - **404 = caught up:** the cursor is not advanced past a 404, so that sequence is retried next tick.
 - **Fan-out log:** every `notify` emits a `zkb.notify` info line (`kind`, `killmailId`, `systemId`, `mapId`, `href`) via `getLogger('job')`. Because the flash bypasses `ap_map_event`, this is the only durable trace of what triggered an underglow — the `systemId` flashed can be checked against the real system on `href`.
-- **Operational warns** (all via `getLogger('job')`, stdout only): `zkb.tick_failed` / `zkb.rate_limited` when a poll tick throws (with attempt + retry delay), `zkb.fetch_error` on a non-200/non-404 sequence fetch, and `zkb.decode_failed` when a feed entry matches no known killmail shape (drift signal).
+- **Operational warns** (all via `getLogger('job')`, stdout only): `zkb.tick_failed` / `zkb.rate_limited` when a poll tick throws (with attempt + retry delay), `zkb.fetch_error` on a non-200/non-404 sequence fetch, `zkb.seed_failed` (`status`) when the boot seed of `sequence.json` fails and the cursor is left null for a re-seed, and `zkb.decode_failed` when a feed entry matches no known killmail shape (drift signal).
 - **Defensive decode:** accepts the R2Z2 ephemeral shape (killmail nested under `esi`, with `zkb` alongside at the top level), the flat shape (ESI fields at the top level), and the older nested `{ killmail, zkb }`; an unrecognised shape degrades to "no notification", never a crash.
 - Each fetch carries `INTEGRATION_USER_AGENT` (blank UA → zKB 403) and an `INTEGRATION_REQUEST_TIMEOUT_MS` timeout combined with the loop's stop signal.
 
