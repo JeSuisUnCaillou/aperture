@@ -5,8 +5,8 @@ import { useMapActiveChar } from '@/components/map/MapActiveCharContext';
 import { usePresenceForSystem } from '@/components/map/MapPresenceContext';
 import { connectionBadges, connectionStyle, systemClassColor } from '@/components/map/styling';
 import { ChevronDown, ChevronUp, Flag } from 'lucide-react';
-import { connectionTimeLeftMs } from '@/lib/map/connectionState';
-import { formatRelativeFromMs } from '@/lib/map/relativeTime';
+import { connectionExpiredSinceMs, connectionTimeLeftMs } from '@/lib/map/connectionState';
+import { formatAgoFromMs, formatRelativeFromMs } from '@/lib/map/relativeTime';
 import { pingSystemOnServer, updateSystemOnServer } from '@/lib/map/client';
 import { RALLY_UNDERGLOW, UNDERGLOW_PRESETS } from '@/components/map/underglowPresets';
 import { cn } from '@/lib/utils';
@@ -52,8 +52,9 @@ function comparePilots(a: MapPresenceEntry, b: MapPresenceEntry, sort: PilotSort
   return sort.dir === 'asc' ? base : -base;
 }
 
-// Live EOL countdown for one connection, mirroring ConnectionEdge's hook. Null
-// for non-decaying / non-WH connections (no expiry to count down).
+// Live EOL indicator for one connection, mirroring ConnectionEdge's hook. Null
+// for non-decaying / non-WH connections. `eol`/`critical` count down to nominal
+// expiry; the manual `expired` stage counts up ("expired 3h ago").
 function useEolCountdown(c: MapConnectionEdge): string | null {
   const isEol = c.eolStage !== 'none';
   const [now, setNow] = useState(() => Date.now());
@@ -63,6 +64,10 @@ function useEolCountdown(c: MapConnectionEdge): string | null {
     return () => clearInterval(id);
   }, [isEol]);
   if (!isEol) return null;
+  if (c.eolStage === 'expired') {
+    const since = connectionExpiredSinceMs(c, now);
+    return since === null ? null : `expired ${formatAgoFromMs(since)}`;
+  }
   const ms = connectionTimeLeftMs(c, now);
   if (ms === null) return null;
   return formatRelativeFromMs(ms);
@@ -254,7 +259,11 @@ function ConnectionRow({
           key={b.key}
           className={cn(
             'rounded px-1 text-[9px] font-semibold uppercase',
-            b.warn ? 'bg-amber-500/20 text-amber-500' : 'bg-muted text-muted-foreground',
+            b.tone === 'danger'
+              ? 'bg-red-500/20 text-red-500'
+              : b.tone === 'warn'
+                ? 'bg-amber-500/20 text-amber-500'
+                : 'bg-muted text-muted-foreground',
           )}
         >
           {b.label}

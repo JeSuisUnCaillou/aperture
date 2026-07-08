@@ -28,7 +28,7 @@ export type WhMass = (typeof WH_MASSES)[number];
 export const WH_JUMP_MASSES = ['s', 'm', 'l', 'xl'] as const;
 export type WhJumpMass = (typeof WH_JUMP_MASSES)[number];
 
-export const EOL_STAGES = ['none', 'eol', 'critical'] as const;
+export const EOL_STAGES = ['none', 'eol', 'critical', 'expired'] as const;
 export type EolStage = (typeof EOL_STAGES)[number];
 
 export const NOTE_SEVERITIES = ['neutral', 'green', 'yellow', 'red'] as const;
@@ -47,6 +47,7 @@ export const EOL_STAGE_LABELS: Record<EolStage, string> = {
   none: 'None',
   eol: 'EOL (~4h)',
   critical: 'Critical (~1h)',
+  expired: 'Expired',
 };
 
 /** Human labels for the wormhole mass selector in the connection inspector */

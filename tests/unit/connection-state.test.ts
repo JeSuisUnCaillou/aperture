@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { apertureConfig } from '../../aperture.config';
 import {
+  connectionExpiredSinceMs,
   connectionExpiresAt,
   connectionTimeLeftMs,
   type ConnectionLifecycleInput,
@@ -51,6 +52,33 @@ describe('connectionExpiresAt', () => {
   it('returns null when an EOL stage is set but eolAt is missing (stale snapshot defence)', () => {
     expect(connectionExpiresAt(wh({ eolStage: 'eol', eolAt: null }))).toBeNull();
     expect(connectionExpiresAt(wh({ eolStage: 'critical', eolAt: null }))).toBeNull();
+  });
+
+  it('returns null for the manual expired stage (no timed expiry to count down to)', () => {
+    expect(connectionExpiresAt(wh({ eolStage: 'expired', eolAt: EOL }))).toBeNull();
+  });
+});
+
+describe('connectionExpiredSinceMs', () => {
+  it('returns ms elapsed since eolAt for an expired wormhole', () => {
+    const since = connectionExpiredSinceMs(wh({ eolStage: 'expired', eolAt: EOL }), EOL_MS + 90_000);
+    expect(since).toBe(90_000);
+  });
+
+  it('clamps to zero when the clock is before the flag instant', () => {
+    expect(connectionExpiredSinceMs(wh({ eolStage: 'expired', eolAt: EOL }), EOL_MS - 1_000)).toBe(0);
+  });
+
+  it('returns null for any non-expired stage or when eolAt is missing', () => {
+    expect(connectionExpiredSinceMs(wh({ eolStage: 'none' }), EOL_MS)).toBeNull();
+    expect(connectionExpiredSinceMs(wh({ eolStage: 'critical', eolAt: EOL }), EOL_MS)).toBeNull();
+    expect(connectionExpiredSinceMs(wh({ eolStage: 'expired', eolAt: null }), EOL_MS)).toBeNull();
+  });
+
+  it('returns null for non-wormhole scopes', () => {
+    expect(
+      connectionExpiredSinceMs(wh({ scope: 'stargate', eolStage: 'expired', eolAt: EOL }), EOL_MS),
+    ).toBeNull();
   });
 });
 

@@ -12,7 +12,7 @@
 | viewData | MapViewData | yes | The canvas's live map data (map meta, systems, connections). Realtime-current. |
 
 ### Renders
-A `max-w-3xl` dialog with a `Tabs` strip. **Summary**: count tiles (systems / connections / online pilots) + a copy-to-clipboard share link (`${origin}/map/<id>`). **Systems**: scrollable table of every system (name/alias, region/constellation, security, status, statics), sorted by name. **Connections**: scrollable table (source → target resolved to system names, scope, mass status, jump size, EOL stage — `EOL` for the 4h stage, `EOL 1h` for critical).
+A `max-w-3xl` dialog with a `Tabs` strip. **Summary**: count tiles (systems / connections / online pilots) + a copy-to-clipboard share link (`${origin}/map/<id>`). **Systems**: scrollable table of every system (name/alias, region/constellation, security, status, statics), sorted by name. **Connections**: scrollable table (source → target resolved to system names, scope, mass status, jump size, EOL stage — `EOL` for the 4h stage, `EOL 1h` for critical, `Expired` for the manual expired stage).
 
 ### Behaviour & Interactions
 - Reads everything from `viewData` (props) + `usePresenceForMap()` (context) — **no server call**. Reopening reflects whatever the canvas state currently is.

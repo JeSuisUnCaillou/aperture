@@ -17,12 +17,12 @@
 | `WhMass` | union type | |
 | `WH_JUMP_MASSES` | `readonly ['s', 'm', 'l', 'xl']` | Mirrors `whJumpMass.enumValues`. |
 | `WhJumpMass` | union type | |
-| `EOL_STAGES` | `readonly ['none', 'eol', 'critical']` | Mirrors `eolStage.enumValues`. |
+| `EOL_STAGES` | `readonly ['none', 'eol', 'critical', 'expired']` | Mirrors `eolStage.enumValues`. |
 | `EolStage` | union type | |
 | `NOTE_SEVERITIES` | `readonly ['neutral', 'green', 'yellow', 'red']` | Mirrors `mapNoteSeverity.enumValues`. |
 | `NoteSeverity` | union type | |
 | `NOTE_SEVERITY_LABELS` | `Record<NoteSeverity, string>` | Human labels for the note severity selector: `Neutral` / `Green` / `Yellow` / `Red`. |
-| `EOL_STAGE_LABELS` | `Record<EolStage, string>` | Human labels for the inspector selector: `None` / `EOL (~4h)` / `Critical (~1h)`. |
+| `EOL_STAGE_LABELS` | `Record<EolStage, string>` | Human labels for the inspector selector: `None` / `EOL (~4h)` / `Critical (~1h)` / `Expired`. |
 | `WH_MASS_LABELS` | `Record<WhMass, string>` | Human labels for the mass selector: `Fresh (>50%)` / `Reduced (<50%)` / `Critical (<10%)`. |
 
 ### Drift guard

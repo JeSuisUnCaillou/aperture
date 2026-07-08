@@ -61,13 +61,17 @@ export const whJumpMass = pgEnum('wh_jump_mass', ['s', 'm', 'l', 'xl']);
 export const routeSafety = pgEnum('route_safety', ['shortest', 'safer', 'less_safe']);
 
 /**
- * End-of-life stage of a wormhole connection. EVE surfaces two decay warnings:
- * `eol` ("reaching the end of its natural lifetime", ~4h left) and the newer
- * `critical` final stage (~1h left). `none` is a hole not yet decaying. The
- * stage selects which lifetime constant drives the countdown + EOL-expiry reap
- * (`WORMHOLE_EOL_LIFETIME_MS` vs `WORMHOLE_EOL_CRITICAL_LIFETIME_MS`).
+ * End-of-life stage of a wormhole connection. EVE surfaces two timed decay
+ * warnings: `eol` ("reaching the end of its natural lifetime", ~4h left) and the
+ * newer `critical` final stage (~1h left); `none` is a hole not yet decaying.
+ * The `eol`/`critical` stage selects which lifetime constant drives the countdown
+ * + EOL-expiry reap (`WORMHOLE_EOL_LIFETIME_MS` vs `WORMHOLE_EOL_CRITICAL_LIFETIME_MS`).
+ * `expired` is the terminal manual stage (EVE's "expiration imminent" / Expired):
+ * set only by a scout. It shows an elapsed-since readout rather than a countdown,
+ * and the EOL-expiry reaper purges it a generous `WORMHOLE_EXPIRED_LIFETIME_MS`
+ * after `eol_at` (on opt-in maps) — long enough to be confident the hole is dead.
  */
-export const eolStage = pgEnum('eol_stage', ['none', 'eol', 'critical']);
+export const eolStage = pgEnum('eol_stage', ['none', 'eol', 'critical', 'expired']);
 
 /**
  * Outbound chat channel for `ap_map_webhook`. Currently Discord only;

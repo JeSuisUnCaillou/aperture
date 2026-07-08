@@ -11,6 +11,7 @@ Wall-clock instant the connection expires, or `null` when no expiry applies.
 - Wormhole + `eolStage === 'critical'`: `eolAt + WORMHOLE_EOL_CRITICAL_NOMINAL_MS` (1h).
 - Wormhole + `eolStage === 'eol'`: `eolAt + WORMHOLE_EOL_NOMINAL_MS` (4h).
 - Wormhole + `eolStage === 'none'`: `createdAt + WORMHOLE_DEFAULT_LIFETIME_MS`.
+- Wormhole + `eolStage === 'expired'`: `null` (the manual terminal stage has no timed expiry).
 - Stargate / jumpbridge / abyssal: `null` (these connections never expire — the EOL state machine only applies to wormholes).
 - EOL stage set but `eolAt` is null (stale-snapshot defence): `null`.
 
@@ -23,6 +24,11 @@ Wall-clock instant the connection expires, or `null` when no expiry applies.
 
 ### connectionTimeLeftMs(c: ConnectionLifecycleInput, now?: number): number | null
 Milliseconds until `connectionExpiresAt(c)`. Returns `null` for non-expiring connections and `0` once past expiry (clamped, never negative). `now` defaults to `Date.now()` but is injectable for tests.
+
+---
+
+### connectionExpiredSinceMs(c: ConnectionLifecycleInput, now?: number): number | null
+Milliseconds since a wormhole was manually marked `expired`, measured from `eolAt`. Returns `null` for any other stage/scope or when the `expired` row has no `eolAt`. Drives the "Expired X ago" readout that replaces the countdown on an expired hole. `now` is injectable for tests.
 
 ---
 

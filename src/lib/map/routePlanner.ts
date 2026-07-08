@@ -30,7 +30,7 @@ export type RouteOverlayEdge = {
   /** Max ship size for a wormhole; null = unknown/not a wormhole (never filtered out). */
   jumpMassClass: WhJumpMass | null;
   massStatus: 'fresh' | 'reduced' | 'critical' | null;
-  eolStage: 'none' | 'eol' | 'critical' | null;
+  eolStage: 'none' | 'eol' | 'critical' | 'expired' | null;
 };
 
 type GateGraph = { adjacency: Map<number, number[]>; trueSec: Map<number, number> };

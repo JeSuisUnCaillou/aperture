@@ -307,7 +307,7 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
   );
 }
 
-// EOL-stage picker (none / eol / critical), the same three-stage control the
+// EOL-stage picker (none / eol / critical / expired), the same control the
 // connection offers in its right-click menu. For a wormhole sig linked to a
 // connection the connection's `eolStage` is authoritative (so the stage shows in
 // and edits from both places); before a connection exists the sig carries the
@@ -343,11 +343,12 @@ const EOL_STAGE_SHORT_LABELS: Record<EolStage, string> = {
   none: 'None',
   eol: '4h',
   critical: '1h',
+  expired: 'EXP',
 };
 
-// The three EOL stages share the connection's `EOL_STAGE_LABELS` in the dropdown.
-// `eol`/`critical` tint amber so a live hole stands out; `none` reads as muted
-// static text.
+// The EOL stages share the connection's `EOL_STAGE_LABELS` in the dropdown.
+// `eol`/`critical` tint amber and the terminal `expired` tints red so a flagged
+// hole stands out; `none` reads as muted static text.
 function EolStageSelect({
   value,
   onValueChange,
@@ -365,7 +366,9 @@ function EolStageSelect({
     >
       <SelectTrigger
         className={cn(
-          value !== 'none' && 'text-amber-600 dark:text-amber-300',
+          value === 'expired'
+            ? 'text-destructive'
+            : value !== 'none' && 'text-amber-600 dark:text-amber-300',
           triggerClassName,
         )}
         aria-label="Wormhole EOL stage"

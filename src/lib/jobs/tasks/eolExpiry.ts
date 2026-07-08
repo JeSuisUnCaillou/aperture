@@ -9,11 +9,12 @@ import type { JobModule } from '../registry';
 /**
  * EOL-expiry cron: delete `ap_map_connection` rows that have been
  * end-of-life (`eol_stage <> 'none'`) for longer than the lifetime of their
- * *current* stage — `WORMHOLE_EOL_LIFETIME_MS` (4h 15m) for the `eol` stage,
- * `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (1h 15m) for the `critical` stage — but
- * only on maps where `ap_map.delete_eol_connections = true`. Each delete fires
- * through `commitMapEvent` so it becomes a `connection.delete` event on the
- * realtime bus.
+ * *current* stage — `WORMHOLE_EOL_LIFETIME_MS` (4h 36m) for the `eol` stage,
+ * `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (1h 15m) for the `critical` stage,
+ * `WORMHOLE_EXPIRED_LIFETIME_MS` (4h) for the manual `expired` stage (measured
+ * from `eol_at`, the moment a scout flagged it) — but only on maps where
+ * `ap_map.delete_eol_connections = true`. Each delete fires through
+ * `commitMapEvent` so it becomes a `connection.delete` event on the realtime bus.
  *
  * Shares the ms constants with the canvas EOL countdown so the
  * "expires in X" hint and the actual reap threshold can never drift apart; the
@@ -45,6 +46,8 @@ async function expireEol(): Promise<{ scanned: number; deleted: number; failed: 
         // is text; cast it to double precision for make_interval's `secs` arg.
         sql`${apMapConnection.eolAt} < now() - make_interval(secs => (case when ${apMapConnection.eolStage} = 'critical' then ${
           apertureConfig.WORMHOLE_EOL_CRITICAL_LIFETIME_MS / 1000
+        } when ${apMapConnection.eolStage} = 'expired' then ${
+          apertureConfig.WORMHOLE_EXPIRED_LIFETIME_MS / 1000
         } else ${apertureConfig.WORMHOLE_EOL_LIFETIME_MS / 1000} end)::double precision)`,
         eq(apMap.deleteEolConnections, true),
         isNull(apMap.deletedAt),

@@ -276,6 +276,16 @@ export const apertureConfig = {
   WORMHOLE_EOL_CRITICAL_LIFETIME_MS: 4_500_000,
 
   /**
+   * Reap threshold for an `expired`-stage wormhole, measured from `eol_at` (the
+   * moment a scout manually marked it Expired): 4h. Longer than the worst-case
+   * remaining life once EVE surfaces "expiration imminent" (max wormhole lifetime
+   * is nominal + ~10% variance), so deleting the row is a safe bet that the hole
+   * has collapsed in-game too. Read by the EOL-expiry job. The `expired` stage
+   * shows an elapsed-since readout, not a countdown, so nothing displays this.
+   */
+  WORMHOLE_EXPIRED_LIFETIME_MS: 14_400_000,
+
+  /**
    * Default lifetime of a (non-EOL) wormhole connection from creation: 48h. Used
    * for the canvas "expires in X" hint before the connection is flagged EOL, and
    * by the expired-connection cleanup cron as the practical lifetime cap.

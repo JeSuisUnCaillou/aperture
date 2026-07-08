@@ -182,7 +182,15 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
                 wormholeCode={data.wormholeCode}
               >
                 {badges.map((b) =>
-                  b.warn ? (
+                  b.tone === 'danger' ? (
+                    <span
+                      key={b.key}
+                      className="rounded-sm bg-red-600 px-1 py-px font-bold text-white"
+                      aria-label="Expired connection — do not jump"
+                    >
+                      {b.label}
+                    </span>
+                  ) : b.tone === 'warn' ? (
                     <span
                       key={b.key}
                       className="rounded-sm bg-amber-400 px-1 py-px font-bold text-black"
