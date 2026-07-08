@@ -62,6 +62,15 @@ export const apertureConfig = {
   ZKB_FEED_MAX_CATCHUP: 200,
 
   /**
+   * Max age (from the ESI `killmail_time`) a feed kill may have and still flash.
+   * zKB appends reprocessed / late-submitted killmails to the live R2Z2 sequence,
+   * so a healthy forward walk can hand us a months-old kill; anything older than
+   * this is dropped before it can fan out. Wide enough to cover feed + processing
+   * latency, far below the age of a reprocessed kill.
+   */
+  ZKB_FEED_MAX_KILL_AGE_MS: 600_000,
+
+  /**
    * Retention for the `universe_killmail` cache, in days. Killmail relevance
    * decays and zKillboard only surfaces recent kills, so the `killmail-cleanup`
    * reaper deletes rows whose `killmail_time` is older than this.

@@ -14,13 +14,15 @@ vi.mock('@/db/client', () => {
   return { db: { select, execute } };
 });
 
-// Capture warns so the seed-failure path can assert `zkb.seed_failed` fires.
-// Hoisted because `zkbFeed.ts` binds its logger at import time, before this line.
-const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+// Capture warns/infos so the seed-failure path can assert `zkb.seed_failed` and
+// the freshness guard can assert `zkb.stale_skipped`. Hoisted because
+// `zkbFeed.ts` binds its logger at import time, before this line.
+const { warn, info } = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn() }));
 vi.mock('@/lib/log/logger', () => ({
-  getLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn, error: vi.fn(), fatal: vi.fn() }),
+  getLogger: () => ({ debug: vi.fn(), info, warn, error: vi.fn(), fatal: vi.fn() }),
 }));
 
+import { apertureConfig } from '../../aperture.config';
 import { db } from '@/db/client';
 import {
   __resetZkbFeedState,
@@ -91,6 +93,7 @@ describe('pollOnce', () => {
   it('walks sequences from the cursor, notifies matches, and stops at a 404', async () => {
     const kill = {
       killmail_id: 555,
+      killmail_time: new Date().toISOString(),
       solar_system_id: 30000142,
       victim: { ship_type_id: 587 },
       zkb: { totalValue: 8_000_000 },
@@ -155,6 +158,7 @@ describe('pollOnce', () => {
       hash: 'abc',
       esi: {
         killmail_id: 555,
+        killmail_time: new Date().toISOString(),
         solar_system_id: 30000142,
         victim: { ship_type_id: 587 },
         attackers: [{}, {}],
@@ -174,5 +178,57 @@ describe('pollOnce', () => {
     expect(result.processed).toBe(1);
     expect(result.notified).toBe(1);
     expect(db.execute as Mock).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips a stale kill (older than the max age) but notifies a fresh one in the same tick', async () => {
+    const stale = {
+      killmail_id: 134704737,
+      killmail_time: new Date(Date.now() - apertureConfig.ZKB_FEED_MAX_KILL_AGE_MS - 60_000).toISOString(),
+      solar_system_id: 30000142,
+    };
+    const fresh = {
+      killmail_id: 555,
+      killmail_time: new Date().toISOString(),
+      solar_system_id: 30000142,
+    };
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/sequence.json')) return jsonResponse({ sequence: 100 });
+      if (url.endsWith('/101.json')) return jsonResponse(stale);
+      if (url.endsWith('/102.json')) return jsonResponse(fresh);
+      return new Response('', { status: 404 });
+    }) as unknown as typeof fetch;
+
+    await pollOnce(); // seed cursor = 100
+    const result = await pollOnce();
+
+    // Both sequences are consumed (cursor advances past the stale one), but only
+    // the fresh kill fans out.
+    expect(result.processed).toBe(2);
+    expect(result.notified).toBe(1);
+    expect(result.cursor).toBe(102);
+    expect(db.execute as Mock).toHaveBeenCalledTimes(1);
+    expect(info).toHaveBeenCalledWith(
+      'zkb.stale_skipped',
+      expect.objectContaining({ killmailId: 134704737 }),
+    );
+  });
+
+  it('drops a kill with a missing killmail_time rather than flashing it', async () => {
+    const undated = { killmail_id: 999, solar_system_id: 30000142 };
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/sequence.json')) return jsonResponse({ sequence: 100 });
+      if (url.endsWith('/101.json')) return jsonResponse(undated);
+      return new Response('', { status: 404 });
+    }) as unknown as typeof fetch;
+
+    await pollOnce(); // seed cursor = 100
+    const result = await pollOnce();
+
+    expect(result.processed).toBe(1);
+    expect(result.notified).toBe(0);
+    expect(db.execute as Mock).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith('zkb.stale_skipped', { killmailId: 999, ageMs: null });
   });
 });

@@ -26,6 +26,7 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 **Third-party integrations (read-side)**
 - `INTEGRATION_REQUEST_TIMEOUT_MS`, `INTEGRATION_USER_AGENT` — shared timeout + UA for zKillboard / EVE-Scout / GitHub.
 - `ZKB_R2Z2_BASE`, `ZKB_FEED_POLL_MS` (≥6s hard floor), `ZKB_FEED_INDEX_REFRESH_MS`, `ZKB_FEED_MAX_CATCHUP` — zKillboard R2Z2 live-feed config.
+- `ZKB_FEED_MAX_KILL_AGE_MS` (10 min) — max age from ESI `killmail_time` a feed kill may have and still flash; older (or undatable) kills are dropped so reprocessed / late-submitted killmails zKB appends to the live sequence don't trigger a phantom underglow.
 - `GITHUB_CHANGELOG_REPO`, `GITHUB_CHANGELOG_REVALIDATE_S` — GitHub releases changelog feed.
 - `KILLMAIL_CACHE_RETENTION_DAYS` (30), `KILLMAIL_CLEANUP_CRON` — retention window and daily sweep cadence for the `universe_killmail` cache reaper (`killmail-cleanup`).
 
