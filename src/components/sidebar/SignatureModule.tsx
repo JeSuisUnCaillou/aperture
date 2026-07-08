@@ -445,6 +445,7 @@ export function SignatureModule({
   onDelete,
   onConnectionPatch,
   flashSigId = null,
+  pasteFlash,
 }: {
   system: MapSystemNode | null;
   signatures: MapSignature[];
@@ -455,6 +456,7 @@ export function SignatureModule({
   onDelete: (signatureId: string) => void;
   onConnectionPatch: (connectionId: string, patch: UpdateConnectionBody) => void;
   flashSigId?: string | null;
+  pasteFlash?: Record<string, 'created' | 'updated'>;
 }) {
   return (
     <Card className="flex h-full flex-col gap-3 p-3">
@@ -474,6 +476,7 @@ export function SignatureModule({
           onDelete={onDelete}
           onConnectionPatch={onConnectionPatch}
           flashSigId={flashSigId}
+          pasteFlash={pasteFlash}
         />
       )}
     </Card>
@@ -598,6 +601,7 @@ function SignaturePanelBody({
   onDelete,
   onConnectionPatch,
   flashSigId = null,
+  pasteFlash,
 }: {
   system: MapSystemNode;
   signatures: MapSignature[];
@@ -608,6 +612,7 @@ function SignaturePanelBody({
   onDelete: (signatureId: string) => void;
   onConnectionPatch: (connectionId: string, patch: UpdateConnectionBody) => void;
   flashSigId?: string | null;
+  pasteFlash?: Record<string, 'created' | 'updated'>;
 }) {
   const rows = useMemo(
     () => signatures.filter((s) => s.mapSystemId === system.id),
@@ -793,6 +798,8 @@ function SignaturePanelBody({
                 className={cn(
                   'border-t border-foreground/10 align-middle even:bg-foreground/[0.03]',
                   row.original.id === flashSigId && 'ap-sig-flash',
+                  pasteFlash?.[row.original.id] === 'created' && 'ap-sig-flash-created',
+                  pasteFlash?.[row.original.id] === 'updated' && 'ap-sig-flash-updated',
                 )}
               >
                 {row.getVisibleCells().map((cell) => (

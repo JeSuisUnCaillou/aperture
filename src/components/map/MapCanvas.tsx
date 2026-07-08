@@ -345,6 +345,9 @@ export function MapCanvas({
   });
   const [flashSigId, setFlashSigId] = useState<string | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Sonar-ping highlight of sigs a local bulk paste created/updated (issue #209).
+  const [pasteFlash, setPasteFlash] = useState<Record<string, 'created' | 'updated'>>({});
+  const pasteFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // One-shot "Lazy delete" arm for the CTRL+V fast paste: when on, the next
   // direct scanner paste also removes missing sigs, then disarms itself.
   const [lazyDeleteSigs, setLazyDeleteSigs] = useState(false);
@@ -540,7 +543,10 @@ export function MapCanvas({
 
   // Flush nothing but cancel a pending debounce on unmount.
   useEffect(() => () => clearTimeout(saveTimer.current ?? undefined), []);
-  useEffect(() => () => clearTimeout(flashTimer.current ?? undefined), []);
+  useEffect(() => () => {
+    clearTimeout(flashTimer.current ?? undefined);
+    clearTimeout(pasteFlashTimer.current ?? undefined);
+  }, []);
 
   const handleLayoutChange = useCallback(
     (_current: Layout, all: ResponsiveLayouts<Breakpoint>) => {
@@ -948,6 +954,17 @@ export function MapCanvas({
     for (const p of payloads) appliedEventIds.current.add(p.eventId);
     setViewData((prev) => payloads.reduce(applyEvent, prev));
     hydrateAddedSystems(payloads);
+
+    const flashes: Record<string, 'created' | 'updated'> = {};
+    for (const p of payloads) {
+      if (p.kind === 'signature.create') flashes[p.id] = 'created';
+      else if (p.kind === 'signature.update') flashes[p.id] = 'updated';
+    }
+    if (Object.keys(flashes).length > 0) {
+      if (pasteFlashTimer.current) clearTimeout(pasteFlashTimer.current);
+      setPasteFlash(flashes);
+      pasteFlashTimer.current = setTimeout(() => setPasteFlash({}), 2500);
+    }
   }, [hydrateAddedSystems]);
 
   // ---- xyflow → server callbacks -----------------------------------------
@@ -2008,6 +2025,7 @@ export function MapCanvas({
             onDelete={onSignatureDelete}
             onConnectionPatch={onConnectionPatch}
             flashSigId={flashSigId}
+            pasteFlash={pasteFlash}
           />
         );
       case 'sigSearch':
