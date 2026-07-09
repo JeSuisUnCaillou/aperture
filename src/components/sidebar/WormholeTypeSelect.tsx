@@ -191,7 +191,7 @@ export function WormholeTypeSelect({
         </SelectValue>
       </SelectTrigger>
       <SelectContent className="p-0.5">
-        <SelectItem className="py-1" value={NONE_VALUE}>
+        <SelectItem className="py-1 text-muted-foreground" value={NONE_VALUE}>
           {loading ? 'Loading…' : 'Select type…'}
         </SelectItem>
         {prefs.grouped ? (
