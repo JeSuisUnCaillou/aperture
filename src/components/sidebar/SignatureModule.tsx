@@ -128,6 +128,24 @@ function defaultExpiry(): string {
   return new Date(Date.now() + apertureConfig.SIGNATURE_DEFAULT_TTL_MS).toISOString();
 }
 
+/**
+ * The class label of the system on the far end of a bound connection, used to
+ * back-filter the WH-type picker to types that could open onto it. Null when no
+ * connection is bound or the far end's class is unknown.
+ */
+function connectionFarClass(
+  connectionId: string | null,
+  system: MapSystemNode,
+  connections: MapConnectionEdge[],
+  systems: MapSystemNode[],
+): string | null {
+  if (connectionId == null) return null;
+  const conn = connections.find((c) => c.id === connectionId);
+  if (!conn) return null;
+  const otherId = conn.source === system.id ? conn.target : conn.source;
+  return systems.find((s) => s.id === otherId)?.security ?? null;
+}
+
 function formatAgoIso(iso: string): string {
   const ts = new Date(iso).getTime();
   if (Number.isNaN(ts)) return iso;
@@ -236,7 +254,7 @@ function GroupCell({ row, table }: CellContext<MapSignature, SignatureGroupKey |
 
 function TypeColumnCell({ row, table }: CellContext<MapSignature, unknown>) {
   const sig = row.original;
-  const { system, onPatch, syncConnectionSize } =
+  const { system, connections, systems, onPatch, syncConnectionSize } =
     table.options.meta as SignatureTableMeta;
   const typeMissing =
     sig.groupKey !== null &&
@@ -248,6 +266,7 @@ function TypeColumnCell({ row, table }: CellContext<MapSignature, unknown>) {
         sig={sig}
         onPatch={onPatch}
         onSyncConnectionSize={syncConnectionSize}
+        destinationClass={connectionFarClass(sig.mapConnectionId, system, connections, systems)}
         triggerClassName={FLAT_TRIGGER}
         inputClassName={FLAT_INPUT}
       />
@@ -849,6 +868,7 @@ function SignaturePanelBody({
               staticTypeIds={system.staticTypeIds}
               value={draftTypeId}
               onValueChange={setDraftTypeId}
+              destinationClass={connectionFarClass(draftConnectionId, system, connections, systems)}
             />
           ) : draftGroupKey === null ? (
             <Input className="h-8" placeholder="Pick a group first" disabled />
@@ -902,6 +922,7 @@ function TypeCell({
   sig,
   onPatch,
   onSyncConnectionSize,
+  destinationClass,
   triggerClassName,
   inputClassName,
 }: {
@@ -909,6 +930,7 @@ function TypeCell({
   sig: MapSignature;
   onPatch: (signatureId: string, patch: UpdateSignatureBody) => void;
   onSyncConnectionSize: (typeId: number | null, connectionId: string | null) => void;
+  destinationClass: string | null;
   triggerClassName?: string;
   inputClassName?: string;
 }) {
@@ -931,6 +953,7 @@ function TypeCell({
           // Picking the type completes the inference when a connection is already linked.
           onSyncConnectionSize(typeId, sig.mapConnectionId);
         }}
+        destinationClass={destinationClass}
         triggerClassName={triggerClassName}
       />
     );

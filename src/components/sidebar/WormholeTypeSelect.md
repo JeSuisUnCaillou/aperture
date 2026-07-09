@@ -11,6 +11,7 @@
 | value | number \| null | yes | Selected `universe_wormhole.type_id`, or null when unset. |
 | onValueChange | (next: number \| null) => void | yes | Fires when the user picks a different option. |
 | disabled | boolean | no | Disables the trigger. |
+| destinationClass | string \| null | no | The bound leads-to connection's far-end class label. When set, back-filters the list to types whose `targetClass` matches it; null/absent = no destination constraint. |
 | triggerClassName | string | no | Merged onto the `SelectTrigger` (via `cn`) — used by `SignatureModule` to flatten the pill styling in-table. |
 
 ### Renders
@@ -24,7 +25,7 @@ Layout follows the device-local `wormholePickerPrefs` (`grouped`), subscribed li
 - **Potential wandering** — class-matched, non-static, non-frig, non-edge holes.
 - **Frig holes** — class-matched frigate-sized holes (`jumpMassClass === 's'`).
 - **Edge cases** — class-matched holes leading to Thera (`C12`) or Pochven (`P`).
-- **Others** (`!matchesClass`) — the rest of the catalog, hidden behind a `Show all types (+N)` / `Show fewer` toggle button at the foot of the list (a plain `<button>`, not a `SelectItem`, so clicking it expands the group without selecting or dismissing the popup).
+- **Others** — every catalog hole not shown in the default sections above, hidden behind a `Show all types (+N)` / `Show fewer` toggle button at the foot of the list (a plain `<button>`, not a `SelectItem`, so clicking it expands the group without selecting or dismissing the popup). This is the escape-hatch complement: it holds the class-implausible holes (`!matchesClass`) plus, when a `destinationClass` narrows the default sections, the holes that don't open onto that class — so the fallback always reaches literally every type regardless of the destination constraint.
 
 The Potential-wandering and Frig-hole sections order their options by destination class (via `subgroupByClass`) so same-class holes cluster together; the per-row color-coded class label carries the class, so no per-class sub-header is drawn.
 
@@ -34,6 +35,7 @@ Option rows and the popup are vertically compacted (`py-1` items, `p-0.5` conten
 
 ### Behaviour & Interactions
 - On mount, calls `fetchWormholeCatalog()` — the static catalog is fetched **once per session** and shared by every dropdown (no per-system fetch). The component then derives this system's options with `annotateWormholeTypes(catalog, { security, staticTypeIds })` in a `useMemo`.
+- **Destination back-filter:** when `destinationClass` is set (the far-end class of a bound leads-to connection), only the **default-visible sections** are narrowed to types whose `targetClass` equals it — plus any null-target hole (`K162`, Drifter/shattered access) that resolves from the far side, and the current `value` (so a mismatched existing selection still renders in its section). The `others`/`Show all` fallback is left unconstrained, so the full catalog stays reachable. This is the reverse of `ConnectionSelect`'s type→leads-to filter, so the two stay mutually consistent whichever side is set first. Alphabetical mode renders the full unfiltered list (its own escape hatch), so the back-filter applies to grouped mode only.
 - Subscribes to `wormholePickerPrefs` via `useSyncExternalStore`; a toggle flipped in Map Settings re-renders every open picker live.
 - `showAll` (local) gates the "others" group; collapsed by default. The parent re-mount also resets this naturally.
 - Disables itself during the initial load.

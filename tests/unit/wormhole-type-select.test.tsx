@@ -258,3 +258,118 @@ describe('WormholeTypeSelect — grouping modes', () => {
     expect(headerTexts()).toHaveLength(0);
   });
 });
+
+describe('WormholeTypeSelect — destination back-filter', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  // Class-matched holes with concrete destinations: two leading to C2, one to C4.
+  const TO_C2_D845 = makeEntry(10, 'D845', { sourceClasses: ['C3'], targetClass: 'C2' });
+  const TO_C2_O883 = makeEntry(11, 'O883', { sourceClasses: ['C3'], targetClass: 'C2' });
+  const TO_C4_M267 = makeEntry(12, 'M267', { sourceClasses: ['C3'], targetClass: 'C4' });
+
+  beforeEach(() => {
+    (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.clearAllMocks();
+    mockPrefs.mockReturnValue({ grouped: true });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  function resolvedOptions(options: WormholeCatalogEntry[]) {
+    mockFetch.mockResolvedValue({ ok: true, data: options });
+  }
+
+  function itemValues(): string[] {
+    return Array.from(container.querySelectorAll<HTMLElement>('[data-slot="select-item"]'))
+      .map((el) => el.dataset.value ?? '')
+      .filter(Boolean);
+  }
+
+  function renderWith(value: number | null, destinationClass: string | null) {
+    act(() => {
+      root.render(
+        <WormholeTypeSelect
+          systemSecurity={SYSTEM_SECURITY}
+          staticTypeIds={SYSTEM_STATIC_TYPE_IDS}
+          value={value}
+          onValueChange={vi.fn()}
+          destinationClass={destinationClass}
+        />,
+      );
+    });
+  }
+
+  it('keeps only types whose targetClass matches the destination (plus null-target K162)', async () => {
+    resolvedOptions([TO_C2_D845, TO_C2_O883, TO_C4_M267, K162]);
+    renderWith(null, 'C2');
+    await act(async () => {});
+
+    const values = itemValues();
+    expect(values).toContain('10'); // D845 → C2
+    expect(values).toContain('11'); // O883 → C2
+    expect(values).toContain('2'); // K162 → null target, always consistent
+    expect(values).not.toContain('12'); // M267 → C4, filtered out
+  });
+
+  it('drops the system static when it is inconsistent with the destination', async () => {
+    // A242 static leads to C3; a C2 destination excludes it.
+    resolvedOptions([STATIC_A242, TO_C2_D845, K162]);
+    renderWith(null, 'C2');
+    await act(async () => {});
+
+    const values = itemValues();
+    expect(values).not.toContain('1'); // A242 static → C3
+    expect(values).toContain('10'); // D845 → C2
+  });
+
+  it('keeps the current selection visible even when it mismatches the destination', async () => {
+    resolvedOptions([TO_C2_D845, TO_C4_M267]);
+    renderWith(12, 'C2'); // M267 (→C4) is selected but destination is C2
+    await act(async () => {});
+
+    const values = itemValues();
+    expect(values).toContain('12'); // exempted so the trigger can still render it
+    expect(values).toContain('10'); // D845 → C2
+  });
+
+  it('applies no destination constraint when destinationClass is null', async () => {
+    resolvedOptions([TO_C2_D845, TO_C4_M267, K162]);
+    renderWith(null, null);
+    await act(async () => {});
+
+    const values = itemValues();
+    expect(values).toContain('10');
+    expect(values).toContain('12'); // not filtered — no destination set
+    expect(values).toContain('2');
+  });
+
+  it('surfaces destination-inconsistent holes only behind the show-all fallback', async () => {
+    resolvedOptions([TO_C2_D845, TO_C4_M267, K162]);
+    renderWith(null, 'C2');
+    await act(async () => {});
+
+    // M267 (→C4) is hidden from the default sections under a C2 destination.
+    expect(itemValues()).not.toContain('12');
+
+    // The "show all" fallback counts it and, when expanded, reveals it — the
+    // fallback is unconstrained by the destination so nothing is unreachable.
+    const button = Array.from(container.querySelectorAll('button')).find((b) =>
+      /show all types/i.test(b.textContent ?? ''),
+    );
+    expect(button).toBeTruthy();
+    expect(button!.textContent).toMatch(/\+1/);
+
+    act(() => {
+      button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(itemValues()).toContain('12');
+  });
+});

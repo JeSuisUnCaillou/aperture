@@ -2,6 +2,7 @@
 
 import {
   Fragment,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -56,6 +57,7 @@ export function WormholeTypeSelect({
   value,
   onValueChange,
   disabled,
+  destinationClass,
   triggerClassName,
 }: {
   /** Host system's class label (`MapSystemNode.security`) — drives `matchesClass`. */
@@ -66,6 +68,14 @@ export function WormholeTypeSelect({
   value: number | null;
   onValueChange: (next: number | null) => void;
   disabled?: boolean;
+  /**
+   * The bound leads-to connection's far-end class label. When set, back-filters
+   * the list to types whose `targetClass` matches it (plus `K162` / any
+   * null-target hole, which resolve from the far side); null = no destination
+   * constraint. The current `value` is always kept so a mismatched existing
+   * selection still renders in the trigger.
+   */
+  destinationClass?: string | null;
   triggerClassName?: string;
 }) {
   // Combine `loading` and `catalog` in one state object so the effect body only
@@ -109,10 +119,43 @@ export function WormholeTypeSelect({
     return labels;
   }, [options]);
 
-  // Semantic groups: statics (pinned), K162, class-matched wandering/frig/edge
-  // (shown by default), and everything else (behind "show all"). Each keeps the
-  // catalog's alphabetical order.
-  const groups = useMemo(() => partitionWormholeOptions(options), [options]);
+  // A type is consistent with the bound leads-to when it opens onto that class,
+  // resolves from the far side (null target, e.g. K162), or is the current
+  // selection (kept so a mismatched existing pick still renders in its section).
+  const destinationConsistent = useCallback(
+    (opt: WormholeTypeOption) =>
+      opt.targetClass == null || opt.targetClass === destinationClass || opt.typeId === value,
+    [destinationClass, value],
+  );
+
+  // Default-visible semantic groups (statics pinned, K162, class-matched
+  // wandering/frig/edge), each keeping the catalog's alphabetical order and —
+  // when a leads-to is bound — narrowed to that destination class. `others` is
+  // the full complement: every remaining catalog hole, surfaced only behind the
+  // "show all" fallback, unconstrained by the destination so nothing is ever
+  // unreachable.
+  const { defaults, others } = useMemo(() => {
+    const g = partitionWormholeOptions(options);
+    const keep = (opts: WormholeTypeOption[]) =>
+      destinationClass == null ? opts : opts.filter(destinationConsistent);
+    const defaults = {
+      statics: keep(g.statics),
+      k162: keep(g.k162),
+      wandering: keep(g.wandering),
+      frig: keep(g.frig),
+      edge: keep(g.edge),
+    };
+    const shown = new Set(
+      [
+        ...defaults.statics,
+        ...defaults.k162,
+        ...defaults.wandering,
+        ...defaults.frig,
+        ...defaults.edge,
+      ].map((o) => o.typeId),
+    );
+    return { defaults, others: options.filter((o) => !shown.has(o.typeId)) };
+  }, [options, destinationClass, destinationConsistent]);
 
   const stringValue = value == null ? NONE_VALUE : String(value);
 
@@ -149,11 +192,11 @@ export function WormholeTypeSelect({
 
   const sections = (
     [
-      ['statics', 'Statics', groups.statics, false],
-      ['k162', "K162's", groups.k162, false],
-      ['wandering', 'Potential wandering', groups.wandering, true],
-      ['frig', 'Frig holes', groups.frig, true],
-      ['edge', 'Edge cases', groups.edge, false],
+      ['statics', 'Statics', defaults.statics, false],
+      ['k162', "K162's", defaults.k162, false],
+      ['wandering', 'Potential wandering', defaults.wandering, true],
+      ['frig', 'Frig holes', defaults.frig, true],
+      ['edge', 'Edge cases', defaults.edge, false],
     ] as const
   )
     .filter(([, , opts]) => opts.length > 0)
@@ -203,7 +246,7 @@ export function WormholeTypeSelect({
               </Fragment>
             ))}
 
-            {groups.others.length > 0 && (
+            {others.length > 0 && (
               <>
                 <OptionDivider />
                 <button
@@ -218,9 +261,9 @@ export function WormholeTypeSelect({
                   }}
                   className="w-full rounded-md px-2 py-1 text-left text-[11px] font-medium uppercase text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
-                  {showAll ? 'Show fewer' : `Show all types (+${groups.others.length})`}
+                  {showAll ? 'Show fewer' : `Show all types (+${others.length})`}
                 </button>
-                {showAll && groups.others.map(renderOption)}
+                {showAll && others.map(renderOption)}
               </>
             )}
           </>
