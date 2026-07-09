@@ -81,3 +81,11 @@
 - Start a **fresh session per stage** (per CLAUDE.md planning convention). Open this file, read the stage, enter the mode it names (`Shift+Tab` toggles Plan ⇄ Accept-edits), and execute just that stage.
 - Stages 1 and 2 are independently shippable and harmless on their own (data + display only). Stage 3 is where behavior changes — keep it gated behind the explicit affordance so a half-done Stage 3 never auto-mutates maps.
 - Don't widen scope to "any fixed-destination hole framework" beyond what J377 needs — `target_system_id` already *is* the general mechanism; J377 is simply its first row. Future Turnur-style holes slot in as data with no further schema work.
+
+## Follow-up — drifter holes leak through the leads-to back-filter (issue #208)
+
+`WormholeTypeSelect` back-filters the picker to types consistent with the bound leads-to connection's class (issue #208, shipped). The filter keeps any hole whose `targetClass` is null, because null means "resolves from the far side" (K162). The drifter/shattered-access holes — **B735, C414, R259, S877, V928** — carry a null `targetClass` in `wormhole-classes.csv` (`B735;H|L|0.0;` = source `H|L|0.0`, target unset), so the filter can't exclude them: they surface in the default list for *any* destination class (e.g. a regular C1), which is confusing.
+
+The real fix is data, not filter logic: these holes lead to Drifter space, not to an arbitrary class, so they need an accurate destination the same way J377/J492 do. Once a drifter hole carries a real destination (a specific system via `target_system_id`, **or** a Drifter/edge destination class if that's the better model for the five-region drifter case), the existing #208 back-filter excludes them for mismatched classes with **no filter-code change** — it's purely the catalog getting more precise.
+
+When picking up this plan (or #212 / #173 / #213), fold the drifter holes in as part of the destination-data pass so #208 stops surfacing them for arbitrary leads-to classes. Until then, the picker's `Show all types` fallback still reaches them, so nothing is unreachable — the leak is noise, not a blocker.
