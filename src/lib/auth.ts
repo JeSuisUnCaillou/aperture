@@ -1,4 +1,4 @@
-import NextAuth from 'next-auth';
+import NextAuth, { AuthError } from 'next-auth';
 import type {} from 'next-auth/jwt';
 import { and, eq, isNull } from 'drizzle-orm';
 import { apertureConfig } from '../../aperture.config';
@@ -16,6 +16,19 @@ import { fetchAffiliations } from '@/lib/esi/affiliation';
 import { getLogger } from '@/lib/log/logger';
 
 const log = getLogger('server');
+
+/**
+ * Thrown from the `signIn` gate when the login-eligibility check cannot be
+ * evaluated because a dependency (the DB) is unreachable — an outage, not a
+ * denial. Auth.js converts a plain thrown error inside `signIn` into
+ * `AccessDenied`, which would mislabel a 500 as "you're not on the allowlist".
+ * Because this is an `AuthError` whose `type` is not client-safe, Auth.js instead
+ * surfaces it as `?error=Configuration`, letting `/access-denied` show a
+ * try-again message rather than the invite-only copy.
+ */
+class LoginGateUnavailable extends AuthError {
+  static type = 'LoginGateUnavailable';
+}
 
 // Auth.js v5, stateless JWT sessions (no DB session store, no Redis).
 // The JWT carries only the active character/user ids; ESI tokens never leave
@@ -119,7 +132,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // entitlements are denied until ESI recovers. Never fail open.
         log.warn('login-gate affiliation fetch failed', { characterId, err });
       }
-      return isLoginAllowed({ characterId, corporationId, allianceId });
+      try {
+        return await isLoginAllowed({ characterId, corporationId, allianceId });
+      } catch (err) {
+        // The gate itself failing (DB unreachable) is a server fault, not a
+        // denial. Re-throw as an AuthError so the browser lands on
+        // `/access-denied?error=Configuration` (try again) instead of
+        // `?error=AccessDenied` (not on the allowlist). Never fail open.
+        log.error('login gate evaluation failed', { characterId, err });
+        throw new LoginGateUnavailable();
+      }
     },
     async jwt({ token, account, profile }) {
       // Initial sign-in: `account` carries the freshly-exchanged tokens and
