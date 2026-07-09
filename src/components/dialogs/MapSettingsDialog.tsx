@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { updateMapSettingsAction } from '@/app/(app)/actions/map';
 import { exportMapOnServer, importMapOnServer } from '@/lib/map/client';
 import { readLowContrast, writeLowContrast } from '@/lib/lowContrast';
+import { readWhPickerPrefs, writeWhPickerPrefs } from '@/lib/wormholePickerPrefs';
 import { MapBehaviorForm } from '@/components/map/manage/MapBehaviorForm';
 import { MapTaggingForm } from '@/components/map/manage/MapTaggingForm';
 import { MapWebhooksPanel } from '@/components/map/manage/MapWebhooksPanel';
@@ -124,10 +125,17 @@ function SettingsPanel() {
   // reads localStorage on first render; safe because this panel only mounts once
   // the dialog opens (never during SSR), so there's no hydration mismatch.
   const [lowContrast, setLowContrast] = useState(readLowContrast);
+  const [whPicker, setWhPicker] = useState(readWhPickerPrefs);
 
   function onToggleLowContrast(next: boolean) {
     setLowContrast(next);
     writeLowContrast(next);
+  }
+
+  function setWhPickerPref(patch: Partial<typeof whPicker>) {
+    const next = { ...whPicker, ...patch };
+    setWhPicker(next);
+    writeWhPickerPrefs(next);
   }
 
   return (
@@ -149,6 +157,24 @@ function SettingsPanel() {
           checked={lowContrast}
           onChange={(e) => onToggleLowContrast(e.target.checked)}
           aria-label="Low-contrast theme"
+        />
+      </label>
+
+      <label className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-muted">
+        <div className="flex flex-1 flex-col gap-0.5">
+          <span className="font-medium text-foreground">Group wormhole types by category</span>
+          <span className="text-xs text-muted-foreground">
+            Organizes the signature type picker into Statics, K162s, wandering, and frig-hole
+            groups — with wandering and frig holes ordered by class — instead of one alphabetical
+            list. On by default.
+          </span>
+        </div>
+        <input
+          type="checkbox"
+          className="size-4 accent-primary"
+          checked={whPicker.grouped}
+          onChange={(e) => setWhPickerPref({ grouped: e.target.checked })}
+          aria-label="Group wormhole types by category"
         />
       </label>
     </div>

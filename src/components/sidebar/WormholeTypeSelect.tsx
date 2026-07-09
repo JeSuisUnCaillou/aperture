@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import {
   Select,
   SelectContent,
@@ -10,13 +17,31 @@ import {
 } from '@/components/ui/select';
 import { fetchWormholeCatalog } from '@/lib/map/client';
 import { systemClassColor } from '@/components/map/styling';
-import { annotateWormholeTypes, type WormholeCatalogEntry } from '@/lib/map/wormholeCatalog';
+import {
+  annotateWormholeTypes,
+  partitionWormholeOptions,
+  subgroupByClass,
+  type WormholeCatalogEntry,
+} from '@/lib/map/wormholeCatalog';
+import {
+  getServerWhPickerPrefs,
+  readWhPickerPrefs,
+  subscribeWhPickerPrefs,
+} from '@/lib/wormholePickerPrefs';
 import type { WormholeTypeOption } from '@/types';
 
 const NONE_VALUE = '__none__';
 
 function OptionDivider() {
   return <div className="my-0.5 h-px bg-border" />;
+}
+
+function GroupHeader({ children }: { children: ReactNode }) {
+  return (
+    <div className="px-2 pt-1 pb-0.5 text-[11px] font-medium uppercase text-muted-foreground">
+      {children}
+    </div>
+  );
 }
 
 /**
@@ -53,6 +78,13 @@ export function WormholeTypeSelect({
   // Whether the "other classes" group (holes that don't plausibly spawn here) is
   // expanded. Collapsed by default — the whole point is a short list.
   const [showAll, setShowAll] = useState(false);
+  // Display prefs (grouped vs alphabetical). Subscribed to the prefs store so a
+  // toggle flipped in Map Settings re-renders every open picker live.
+  const prefs = useSyncExternalStore(
+    subscribeWhPickerPrefs,
+    readWhPickerPrefs,
+    getServerWhPickerPrefs,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -77,23 +109,10 @@ export function WormholeTypeSelect({
     return labels;
   }, [options]);
 
-  // Three groups: the system's statics (pinned), holes that plausibly spawn in
-  // this class (shown by default), and everything else (behind "show all").
-  // Each keeps the server's alphabetical order.
-  const { statics, exitHole, classMatched, others } = useMemo(() => {
-    const statics: WormholeTypeOption[] = [];
-    let exitHole: WormholeTypeOption | undefined;
-    const classMatched: WormholeTypeOption[] = [];
-    const others: WormholeTypeOption[] = [];
-    for (const opt of options) {
-      if (opt.isStatic) statics.push(opt);
-      else if (opt.name === 'K162') exitHole = opt;
-      else if (opt.matchesClass) classMatched.push(opt);
-      else others.push(opt);
-    }
-
-    return { statics, exitHole, classMatched, others };
-  }, [options]);
+  // Semantic groups: statics (pinned), K162, class-matched wandering/frig/edge
+  // (shown by default), and everything else (behind "show all"). Each keeps the
+  // catalog's alphabetical order.
+  const groups = useMemo(() => partitionWormholeOptions(options), [options]);
 
   const stringValue = value == null ? NONE_VALUE : String(value);
 
@@ -114,6 +133,31 @@ export function WormholeTypeSelect({
       </span>
     </SelectItem>
   );
+
+  // A titled section. When `subgroup`, the options are clustered by destination
+  // class (each row already shows its color-coded class, so no per-class header
+  // is needed); otherwise catalog order.
+  const renderGroup = (label: string, opts: WormholeTypeOption[], subgroup: boolean): ReactNode => {
+    const ordered = subgroup ? subgroupByClass(opts).flatMap((sub) => sub.options) : opts;
+    return (
+      <>
+        <GroupHeader>{label}</GroupHeader>
+        {ordered.map(renderOption)}
+      </>
+    );
+  };
+
+  const sections = (
+    [
+      ['statics', 'Statics', groups.statics, false],
+      ['k162', "K162's", groups.k162, false],
+      ['wandering', 'Potential wandering', groups.wandering, true],
+      ['frig', 'Frig holes', groups.frig, true],
+      ['edge', 'Edge cases', groups.edge, false],
+    ] as const
+  )
+    .filter(([, , opts]) => opts.length > 0)
+    .map(([id, label, opts, subgroup]) => ({ id, node: renderGroup(label, opts, subgroup) }));
 
   return (
     <Select<string>
@@ -150,42 +194,38 @@ export function WormholeTypeSelect({
         <SelectItem className="py-1" value={NONE_VALUE}>
           {loading ? 'Loading…' : 'Select type…'}
         </SelectItem>
-        {statics.length > 0 && (
+        {prefs.grouped ? (
           <>
-            <div className="px-2 pt-1 pb-0.5 text-[11px] font-medium uppercase text-muted-foreground">
-              Statics
-            </div>
-            {statics.map(renderOption)}
-          </>
-        )}
-        
-        {exitHole && <>
-          <OptionDivider />
-          {renderOption(exitHole)}
-        </>}
-        
-        {classMatched.length > 0 && <OptionDivider />}
-        {classMatched.map(renderOption)}
+            {sections.map((section, i) => (
+              <Fragment key={section.id}>
+                {i > 0 && <OptionDivider />}
+                {section.node}
+              </Fragment>
+            ))}
 
-        {others.length > 0 && (
-          <>
-            <OptionDivider />
-            <button
-              type="button"
-              // Toggle the "other classes" group without selecting an item or
-              // dismissing the popup (this isn't a SelectItem, so base-ui leaves
-              // it alone — just stop the click from bubbling to the trigger).
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowAll((v) => !v);
-              }}
-              className="w-full rounded-md px-2 py-1 text-left text-[11px] font-medium uppercase text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              {showAll ? 'Show fewer' : `Show all types (+${others.length})`}
-            </button>
-            {showAll && others.map(renderOption)}
+            {groups.others.length > 0 && (
+              <>
+                <OptionDivider />
+                <button
+                  type="button"
+                  // Toggle the "other classes" group without selecting an item or
+                  // dismissing the popup (this isn't a SelectItem, so base-ui leaves
+                  // it alone — just stop the click from bubbling to the trigger).
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowAll((v) => !v);
+                  }}
+                  className="w-full rounded-md px-2 py-1 text-left text-[11px] font-medium uppercase text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  {showAll ? 'Show fewer' : `Show all types (+${groups.others.length})`}
+                </button>
+                {showAll && groups.others.map(renderOption)}
+              </>
+            )}
           </>
+        ) : (
+          options.map(renderOption)
         )}
       </SelectContent>
     </Select>

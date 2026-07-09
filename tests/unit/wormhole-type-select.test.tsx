@@ -5,6 +5,11 @@ import { createRoot, type Root } from 'react-dom/client';
 
 vi.mock('@/lib/map/client', () => ({ fetchWormholeCatalog: vi.fn() }));
 vi.mock('@/components/map/styling', () => ({ systemClassColor: () => '#ffffff' }));
+vi.mock('@/lib/wormholePickerPrefs', () => ({
+  readWhPickerPrefs: vi.fn(() => ({ grouped: true })),
+  getServerWhPickerPrefs: vi.fn(() => ({ grouped: true })),
+  subscribeWhPickerPrefs: vi.fn(() => () => {}),
+}));
 
 // Stub Base UI Select primitives — they require a portal/popup context jsdom can't provide.
 // Each SelectItem renders a div with data-slot="select-item" and data-value=<the value>.
@@ -24,10 +29,12 @@ vi.mock('@/components/ui/select', async () => {
 });
 
 import { fetchWormholeCatalog } from '@/lib/map/client';
+import { readWhPickerPrefs } from '@/lib/wormholePickerPrefs';
 import { WormholeTypeSelect } from '@/components/sidebar/WormholeTypeSelect';
 import type { WormholeCatalogEntry } from '@/types';
 
 const mockFetch = vi.mocked(fetchWormholeCatalog);
+const mockPrefs = vi.mocked(readWhPickerPrefs);
 
 // The host system is a C3 whose only static is A242 (typeId 1). The component
 // derives `isStatic` / `matchesClass` from these props via `annotateWormholeTypes`,
@@ -78,6 +85,7 @@ describe('WormholeTypeSelect — K162 grouping', () => {
   beforeEach(() => {
     (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     vi.clearAllMocks();
+    mockPrefs.mockReturnValue({ grouped: true });
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -177,5 +185,76 @@ describe('WormholeTypeSelect — K162 grouping', () => {
 
     // X702 is in "others" and hidden by default — its SelectItem should not be in the DOM.
     expect(content.querySelector('[data-value="5"]')).toBeNull();
+  });
+});
+
+describe('WormholeTypeSelect — grouping modes', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  // Class-matched holes: a frigate hole (mass 's') and a Thera-target edge hole.
+  const FRIG_E004 = makeEntry(6, 'E004', { sourceClasses: ['C3'], targetClass: 'C1', jumpMassClass: 's' });
+  const EDGE_F135 = makeEntry(7, 'F135', { sourceClasses: ['C3'], targetClass: 'C12', jumpMassClass: 'l' });
+
+  beforeEach(() => {
+    (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.clearAllMocks();
+    mockPrefs.mockReturnValue({ grouped: true });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  function resolvedOptions(options: WormholeCatalogEntry[]) {
+    mockFetch.mockResolvedValue({ ok: true, data: options });
+  }
+
+  function itemValues(): string[] {
+    return Array.from(container.querySelectorAll<HTMLElement>('[data-slot="select-item"]'))
+      .map((el) => el.dataset.value ?? '')
+      .filter(Boolean);
+  }
+
+  function headerTexts(): string[] {
+    const content = container.querySelector('[data-slot="select-content"]')!;
+    return Array.from(content.querySelectorAll<HTMLElement>('div'))
+      .map((el) => el.textContent ?? '')
+      .filter((t) => /Statics|K162|wandering|Frig|Edge/i.test(t));
+  }
+
+  it('renders the frig hole and edge hole under their own group headers', async () => {
+    resolvedOptions([STATIC_A242, K162, CLASS_MATCHED_C140, FRIG_E004, EDGE_F135]);
+    renderSelect(container, root);
+    await act(async () => {});
+
+    // All class-matched items are visible by default (no "show all" needed).
+    const values = itemValues();
+    expect(values).toContain('6'); // frig
+    expect(values).toContain('7'); // edge
+
+    const headers = headerTexts();
+    expect(headers.some((h) => /Frig holes/i.test(h))).toBe(true);
+    expect(headers.some((h) => /Edge cases/i.test(h))).toBe(true);
+  });
+
+  it('alphabetical mode renders a flat list with no group headers and no show-all gating', async () => {
+    mockPrefs.mockReturnValue({ grouped: false });
+    resolvedOptions([STATIC_A242, CLASS_MATCHED_C140, OTHER_X702]);
+    renderSelect(container, root);
+    await act(async () => {});
+
+    const values = itemValues();
+    // Every catalog option is present, including the otherwise-hidden "others" hole.
+    expect(values).toContain('1');
+    expect(values).toContain('3');
+    expect(values).toContain('5'); // X702 — behind "show all" only in grouped mode
+
+    // No section headers in alphabetical mode.
+    expect(headerTexts()).toHaveLength(0);
   });
 });

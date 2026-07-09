@@ -80,3 +80,81 @@ export function annotateWormholeTypes(
     return { ...entry, isStatic, matchesClass };
   });
 }
+
+/** Destination classes that get their own "edge case" group (Thera, Pochven). */
+export const EDGE_TARGET_CLASSES = new Set(['C12', 'P']);
+
+// Class ordering for sub-group headers: wormhole classes first, then k-space /
+// special destinations. Anything unlisted (incl. null) sorts to the end.
+const CLASS_ORDER = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C13', 'H', 'L', '0.0', 'C12', 'P', 'A'];
+
+/**
+ * The WH-type picker's semantic groups for one host system. Each bucket keeps
+ * the catalog's alphabetical order. `others` (holes that don't plausibly spawn
+ * here) stays behind the picker's "show all" toggle; the rest render by default.
+ */
+export type WormholeGroups = {
+  /** The host system's statics. */
+  statics: WormholeTypeOption[];
+  /** The canonical inbound exit hole (0–1 entries). */
+  k162: WormholeTypeOption[];
+  /** Class-matched, non-static, non-frig, non-edge holes. */
+  wandering: WormholeTypeOption[];
+  /** Class-matched frigate-sized holes (`jumpMassClass === 's'`). */
+  frig: WormholeTypeOption[];
+  /** Class-matched holes leading to a special destination (Thera / Pochven). */
+  edge: WormholeTypeOption[];
+  /** Holes that don't plausibly spawn in this class (`!matchesClass`). */
+  others: WormholeTypeOption[];
+};
+
+/** A cluster of options sharing a destination class, for sub-header rendering. */
+export type WormholeClassSubgroup = { classLabel: string | null; options: WormholeTypeOption[] };
+
+/**
+ * Partition annotated options into the picker's semantic groups in a single
+ * pass, preserving the catalog's alphabetical order within each bucket.
+ */
+export function partitionWormholeOptions(options: WormholeTypeOption[]): WormholeGroups {
+  const groups: WormholeGroups = {
+    statics: [],
+    k162: [],
+    wandering: [],
+    frig: [],
+    edge: [],
+    others: [],
+  };
+  for (const opt of options) {
+    if (opt.isStatic) groups.statics.push(opt);
+    else if (opt.name === 'K162') groups.k162.push(opt);
+    else if (!opt.matchesClass) groups.others.push(opt);
+    else if (opt.targetClass != null && EDGE_TARGET_CLASSES.has(opt.targetClass))
+      groups.edge.push(opt);
+    else if (opt.jumpMassClass === 's') groups.frig.push(opt);
+    else groups.wandering.push(opt);
+  }
+  return groups;
+}
+
+/**
+ * Cluster options by destination class for the wandering / frig sub-headers.
+ * Clusters are ordered by `CLASS_ORDER` (unlisted classes and `null` last);
+ * the catalog's alphabetical order is preserved within each cluster.
+ */
+export function subgroupByClass(options: WormholeTypeOption[]): WormholeClassSubgroup[] {
+  const byClass = new Map<string | null, WormholeTypeOption[]>();
+  for (const opt of options) {
+    const key = opt.targetClass ?? null;
+    const bucket = byClass.get(key);
+    if (bucket) bucket.push(opt);
+    else byClass.set(key, [opt]);
+  }
+  const rank = (cls: string | null) => {
+    if (cls == null) return CLASS_ORDER.length;
+    const i = CLASS_ORDER.indexOf(cls);
+    return i === -1 ? CLASS_ORDER.length : i;
+  };
+  return [...byClass.entries()]
+    .map(([classLabel, opts]) => ({ classLabel, options: opts }))
+    .sort((a, b) => rank(a.classLabel) - rank(b.classLabel));
+}
