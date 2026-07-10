@@ -26,15 +26,16 @@
 **Touches:**
 - `src/db/migrations/0048_wormhole_target_system.sql` + `.rollback.sql` + `meta/_journal.json` (hand-written; latest is 0047).
 - `src/db/schema/universe/statics.ts` + `statics.md`, `src/db/schema.md`.
-- `scripts/data/wormhole-classes.csv` (extend to `code;sourceClasses;targetClass;targetSystem`, only J377 populated) **or** a small separate vendored override file — decide in plan mode.
+- `scripts/data/wormhole-classes.csv` — extend the existing catalog to `code;sourceClasses;targetClass;targetSystem`, only J377 populated (`J377;;L;Turnur`). **Decision: extend this file, not a sidecar.** anoik.is is frozen and this CSV is already hand-maintained (originally seeded from anoik, since hand-edited as CCP adds types anoik never tracked), so the "keep the anoik projection pure" argument for a separate file is void, and a fixed destination is an intrinsic property of the type's own row.
 - `src/lib/sde/ingest.ts` + `ingest.md` (`runCsvIngest` / the `wormhole-classes.csv` reader resolves the destination system id; FK-safe against `universe_system`).
 
 **Details:**
 - Add nullable `target_system_id` `integer` FK → `universe_system.id` `ON DELETE RESTRICT` on `universe_wormhole`. NULL for every normal hole (destination genuinely unknown until scanned); set only for fixed-destination holes.
 - The *column* is a schema change (migration). The *value* is `universe_*` data, so it rides the vendored CSV consumed by ingest, per the "data fixes via ingest, not migrations" rule — the migration ships an empty column, ingest fills J377.
 - Reseed remains authoritative (full delete + insert), so the new column must be written on every reseed, not patched in.
+- **Provenance reality (why extend, not regenerate):** the vendored CSVs are no longer a regenerable anoik.is projection. anoik.is is frozen, so the files are hand-maintained (seeded from anoik, then hand-edited as CCP ships new types). Set the `targetSystem` value by hand-editing the J377 row. The stale "Re-pull / regenerate from `static.json`" instruction in `ingest.md` and the "(anoik.is /wormholes)" framing in `statics.md` have been corrected to reflect this — a regenerate would drop J377 and every other hand-added type.
 
-**Done when:** migration applies cleanly (and rolls back); `pnpm sde:csv` populates J377's `target_system_id` with Turnur's id and leaves all other rows NULL; a spot query confirms it; lint + typecheck + build green.
+**Done when:** migration applies cleanly (and rolls back); `ingest.ts` parses the 4th `targetSystem` cell and resolves it to Turnur's id FK-safely against `universe_system`; `pnpm sde:csv` populates J377's `target_system_id` with Turnur's id and leaves all other rows NULL; a spot query confirms it; lint + typecheck + build green.
 
 ---
 

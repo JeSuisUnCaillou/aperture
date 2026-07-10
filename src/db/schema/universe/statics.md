@@ -6,10 +6,10 @@
 ---
 
 ### universeSystemStatic
-`universe_system_static`. PK `(system_id, type_id)`, both CASCADE FKs. Maps each J-space system to the wormhole type(s) that always re-spawn there (anoik.is /systems). Seeded from vendored `scripts/data/system-static.csv` (WH statics are not in the official SDE).
+`universe_system_static`. PK `(system_id, type_id)`, both CASCADE FKs. Maps each J-space system to the wormhole type(s) that always re-spawn there. Hand-maintained in vendored `scripts/data/system-static.csv` (seeded from anoik.is, which is frozen; WH statics are not in the official SDE).
 
 ### universeWormhole
-`universe_wormhole`. PK `type_id` → `universe_type.id` CASCADE. Wormhole-type routing catalog (anoik.is /wormholes).
+`universe_wormhole`. PK `type_id` → `universe_type.id` CASCADE. Wormhole-type routing catalog, hand-maintained in `scripts/data/wormhole-classes.csv` (seeded from anoik.is, which is frozen; new types are hand-added as CCP ships them).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -21,4 +21,4 @@
 - Class-only catalog: mass/lifetime/scan-strength remain dogma-sourced (`universe_type_attribute` + `universe_type_override` via the effective view), so this table vendors only the navigationally-missing source/target class labels.
 - `source_classes` is a Postgres `text[]`: a hole can spawn in several classes (e.g. `S199 = {L, 0.0}`, `R943 = {H, L, 0.0}`). The five Drifter holes (`B735`/`C414`/`R259`/`S877`/`V928`) carry `{H, L, 0.0}` — they spawn only in k-space systems with a Jove Observatory, which isn't determinable from the SDE, so they're broadened to the full k-space set rather than left null (keeps them out of the J-space default suggestions). `null` = anoik leaves the source unspecified — the universal `K162` reverse-exit **plus** the shattered-access holes (e.g. `A009`) whose source class falls outside Aperture's vocabulary. Class-filter queries treat null source as "always offer".
 - `K162` is the universal reverse-exit: `source_classes = null` (appears anywhere), `target_class = null` (resolved from the far side).
-- Seeded from vendored `scripts/data/wormhole-classes.csv` (`code;sourceClasses;targetClass`, `sourceClasses` `|`-joined).
+- Hand-maintained in vendored `scripts/data/wormhole-classes.csv` (`code;sourceClasses;targetClass`, `sourceClasses` `|`-joined); the CSV, not anoik.is, is the source of truth.

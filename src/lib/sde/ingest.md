@@ -28,7 +28,7 @@ The SDE ships duplicate `Wormhole <CODE>` types under group `988` (e.g. two "Wor
 
 ### Vendored community data (anoik.is)
 
-WH data CCP omits from the SDE/ESI is reconstructed by [anoik.is](https://anoik.is). Both files below were derived from anoik.is's single static dataset `https://anoik.is/static/static.json?version=11`, **pulled 2026-05-22**. anoik.is serves this as one cached static asset (the site loads it once into `localStorage`), so the whole dataset is one request — no page scraping. anoik.is is an EVE Online Partner; data is CCP-derived and used here under EVE's third-party developer terms with attribution.
+WH data CCP omits from the SDE/ESI was originally reconstructed from [anoik.is](https://anoik.is), an EVE Online Partner (CCP-derived data, used under EVE's third-party developer terms with attribution). The files below were seeded from anoik.is's single static dataset `https://anoik.is/static/static.json?version=11` (pulled 2026-05-22). anoik.is is frozen and does not carry wormhole types CCP has added since, so these files are **hand-maintained**: new types, and per-type facts anoik never modeled (such as fixed destination systems), are hand-edited directly onto the rows. The CSVs, not anoik.is, are the source of truth.
 
 - **`system-static.csv`** (`systemID;typeID`, 3772 rows) — one row per J-space system × static spawn. `systemID` = `solarSystemID`; `typeID` resolved from each system's `statics[]` code via the dataset's per-code `typeID`.
 - **`wormhole-classes.csv`** (`code;sourceClasses;targetClass`, 90 rows incl. K162) — the WH-type routing catalog. anoik class labels are mapped to Aperture's vocabulary (`c1`→`C1` … `c6`→`C6`, `c13`→`C13`, `hs`→`H`, `ls`→`L`, `ns`→`0.0`, `thera`→`Thera`), matching `universe_system.security`. `sourceClasses` is the hole's full `src` array `|`-joined (e.g. `S199` → `L|0.0`, `R943` → `H|L|0.0`) — multi-source holes are preserved as a set, **not** collapsed. Empty cells:
@@ -36,7 +36,7 @@ WH data CCP omits from the SDE/ESI is reconstructed by [anoik.is](https://anoik.
   - **Drifter holes** (`B735`/`C414`/`R259`/`S877`/`V928`, dest = barbican/conflux/redoubt/sentinel/vidette = classes 14–18): these are the **k-space-side** signatures that open into a Drifter system, and in-game they spawn only in k-space systems holding a Jove Observatory. Jove-Observatory presence isn't determinable from the ingested SDE (no celestial data), so the source is broadened from anoik's `src: null` to the full k-space set `H|L|0.0` — accurate to "k-space only", which keeps them out of the J-space default-suggestion list. `targetClass` is left empty (Drifter classes C14–C18 aren't in Aperture's vocabulary; revisit if added).
   - anoik's dataset omits the unpublished SDE type `J492` (no statics reference it); the catalog follows anoik and does not carry it.
 
-Re-pull: refetch `static.json`, regenerate (`code;sourceClasses;targetClass`, `|`-joined sources), and re-validate the integrity gate (valid-or-null labels, K162 both-null, `A239` resolves to `C2`/`L`, no non-null-source row left empty after mapping).
+Editing: hand-edit rows directly (add types, refine sources/targets, set fixed destinations) and keep the integrity gate green (valid-or-null labels, K162 both-null, `A239` resolves to `C2`/`L`, no non-null-source row left empty after mapping). **Do not regenerate from anoik.is.** It is frozen; a regenerate reverts to the stale dataset and drops every hand-added type.
 
 ---
 
