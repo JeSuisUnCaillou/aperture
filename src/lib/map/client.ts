@@ -11,6 +11,7 @@ import type {
   MapViewData,
   ParsedSigRow,
   ResolvedSigRow,
+  ResolveDestinationResult,
   RestoreConnectionResult,
   SignatureGroupKey,
   StructureIntel,
@@ -501,6 +502,23 @@ export function syncTheraConnectionsOnServer(args: {
   return mutationFetch<TheraSyncResult>('POST', `/api/map/${args.mapId}/thera/sync`, {
     connections: args.connections,
   });
+}
+
+/**
+ * Resolve a wormhole sig's fixed destination (e.g. J377 → Turnur) onto the map
+ * (`map_update`). Places the destination node + a `wh` connection and returns
+ * the committed payloads (folded like import / bulk-paste, wrapper `eventId` 0)
+ * plus the connection id so the caller can link the sig to it. No request body —
+ * the destination is derived server-side from the sig's type.
+ */
+export function resolveSignatureDestinationOnServer(args: {
+  mapId: string;
+  sigId: string;
+}): Promise<ActionResult<ResolveDestinationResult>> {
+  return mutationFetch<ResolveDestinationResult>(
+    'POST',
+    `/api/map/${args.mapId}/signatures/${args.sigId}/resolve-destination`,
+  );
 }
 
 // ---------------------------------------------------------------------------

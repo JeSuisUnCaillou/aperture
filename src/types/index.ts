@@ -319,6 +319,9 @@ export type { MapExportFile, ImportSummary, ImportResult } from '@/lib/map/trans
 // Thera module view-model + sync types (src/lib/map/thera.ts).
 export type { TheraHub, TheraConnection, TheraSyncInput, TheraSyncResult } from '@/lib/map/thera';
 
+// Fixed-destination resolve result (src/lib/map/fixedDestination.ts).
+export type { ResolveDestinationResult } from '@/lib/map/fixedDestination';
+
 // Auto-tagging strategy contract + view-model (src/lib/tagging/types.ts).
 export type {
   ActiveScheme,

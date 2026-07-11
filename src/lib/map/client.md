@@ -95,6 +95,9 @@ GET `/api/map/{mapId}/thera` (view rights). Lists the current EVE-Scout Thera/Tu
 ### syncTheraConnectionsOnServer({ mapId, connections }): Promise<ActionResult<TheraSyncResult>>
 POST `/api/map/{mapId}/thera/sync` (`map_update` right). Folds the chosen connections onto the map and returns the N committed event payloads (wrapper-level `eventId` is `0`); the caller folds each via `onBulkPaste` and registers its `eventId`.
 
+### resolveSignatureDestinationOnServer({ mapId, sigId }): Promise<ActionResult<ResolveDestinationResult>>
+POST `/api/map/{mapId}/signatures/{sigId}/resolve-destination` (`map_update` right, no body). Folds a wormhole sig's fixed destination (e.g. J377 → Turnur) onto the map and returns `{ payloads, connectionId }` (wrapper-level `eventId` is `0`); the caller folds the payloads via `onBulkPaste` and links the sig to `connectionId`.
+
 ### fetchMapSnapshot(mapId: string): Promise<FetchResult<MapViewData>>
 GET `/api/map/{mapId}` (view rights). Returns the full authoritative map snapshot — the same `MapViewData` shape `MapCanvas` mounts with. Backs the on-error resync failsafe: `MapCanvas.resync()` calls this when a mutation fails, then `setViewData(data)` + clears the echo-dedupe set. Uses a **bare `fetch`** (not the shared `readFetch`/`requestJson`) so a failed resync does not fire a second `toast.error` on top of the originating mutation's error.
 

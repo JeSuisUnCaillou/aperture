@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ClipboardPaste, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ClipboardPaste, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   createColumnHelper,
   flexRender,
@@ -46,7 +47,7 @@ import {
   type EolStage,
   type WhJumpMass,
 } from '@/lib/map/enumLabels';
-import { fetchWormholeCatalog } from '@/lib/map/client';
+import { fetchWormholeCatalog, resolveSignatureDestinationOnServer } from '@/lib/map/client';
 import { SIGNATURE_GROUP_CATALOG } from '@/lib/map/signatureGroups';
 import { formatAgoFromMs } from '@/lib/map/relativeTime';
 import { cn } from '@/lib/utils';
@@ -157,6 +158,10 @@ type WormholeTypeMeta = {
   targetClass: string | null;
   /** Inferred per-jump connection size band; null = can't infer (e.g. K162). */
   jumpMassClass: WhJumpMass | null;
+  /** Fixed destination system id (J377 → Turnur); null for normal holes. */
+  targetSystemId: number | null;
+  /** Fixed destination system name; null for normal holes. */
+  targetSystemName: string | null;
 };
 
 /**
@@ -177,7 +182,12 @@ function useWormholeTypeMeta(): Map<number, WormholeTypeMeta> {
         new Map(
           result.data.map((o) => [
             o.typeId,
-            { targetClass: o.targetClass, jumpMassClass: o.jumpMassClass },
+            {
+              targetClass: o.targetClass,
+              jumpMassClass: o.jumpMassClass,
+              targetSystemId: o.targetSystemId,
+              targetSystemName: o.targetSystemName,
+            },
           ]),
         ),
       );
@@ -205,6 +215,10 @@ type SignatureTableMeta = {
   syncConnectionEol: (stage: EolStage, connectionId: string | null) => void;
   metaByTypeId: Map<number, WormholeTypeMeta>;
   assignedConnectionIds: string[];
+  /** Fold a fixed-destination hole's far end onto the map + link the sig. */
+  resolveDestination: (sig: MapSignature) => void;
+  /** The sig currently being resolved (button disabled), or null. */
+  resolvingSigId: string | null;
 };
 
 // Cell renderers are module-level components with fixed identities. TanStack's
@@ -300,11 +314,18 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
     syncConnectionEol,
     metaByTypeId,
     assignedConnectionIds,
+    resolveDestination,
+    resolvingSigId,
   } = table.options.meta as SignatureTableMeta;
   if (sig.groupKey !== 'wormhole') return null;
   const leadsToMissing = sig.mapConnectionId === null;
+  // A fixed-destination hole (J377 → Turnur) whose far end isn't linked yet gets
+  // a one-click resolve button — the destination is a known system, no scan needed.
+  const fixedDest = sig.typeId == null ? null : metaByTypeId.get(sig.typeId) ?? null;
+  const canResolve =
+    sig.mapConnectionId === null && fixedDest?.targetSystemId != null;
   return (
-    <div className={`px-1 py-px${leadsToMissing ? ` ${MISSING_CELL}` : ''}`}>
+    <div className={`flex items-center gap-1 px-1 py-px${leadsToMissing ? ` ${MISSING_CELL}` : ''}`}>
       <ConnectionSelect
         system={system}
         connections={connections}
@@ -322,6 +343,20 @@ function LeadsToCell({ row, table }: CellContext<MapSignature, unknown>) {
         excludeIds={assignedConnectionIds}
         triggerClassName={FLAT_TRIGGER}
       />
+      {canResolve && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="shrink-0"
+          disabled={resolvingSigId === sig.id}
+          aria-label={`Resolve destination to ${fixedDest!.targetSystemName}`}
+          title={`Add ${fixedDest!.targetSystemName} and link this wormhole`}
+          onClick={() => resolveDestination(sig)}
+        >
+          <Plus className="size-3.5" />
+        </Button>
+      )}
     </div>
   );
 }
@@ -458,6 +493,7 @@ const signatureColumns = [
  * selected.
  */
 export function SignatureModule({
+  mapId,
   system,
   signatures,
   connections,
@@ -466,9 +502,11 @@ export function SignatureModule({
   onPatch,
   onDelete,
   onConnectionPatch,
+  onBulkPaste,
   flashSigId = null,
   pasteFlash,
 }: {
+  mapId: string;
   system: MapSystemNode | null;
   signatures: MapSignature[];
   connections: MapConnectionEdge[];
@@ -477,6 +515,7 @@ export function SignatureModule({
   onPatch: (signatureId: string, patch: UpdateSignatureBody) => void;
   onDelete: (signatureId: string) => void;
   onConnectionPatch: (connectionId: string, patch: UpdateConnectionBody) => void;
+  onBulkPaste: (payloads: MapEventPayload[]) => void;
   flashSigId?: string | null;
   pasteFlash?: Record<string, 'created' | 'updated'>;
 }) {
@@ -489,6 +528,7 @@ export function SignatureModule({
       ) : (
         <SignaturePanelBody
           key={system.id}
+          mapId={mapId}
           system={system}
           signatures={signatures}
           connections={connections}
@@ -497,6 +537,7 @@ export function SignatureModule({
           onPatch={onPatch}
           onDelete={onDelete}
           onConnectionPatch={onConnectionPatch}
+          onBulkPaste={onBulkPaste}
           flashSigId={flashSigId}
           pasteFlash={pasteFlash}
         />
@@ -614,6 +655,7 @@ function SignaturePasteButton({
 }
 
 function SignaturePanelBody({
+  mapId,
   system,
   signatures,
   connections,
@@ -622,9 +664,11 @@ function SignaturePanelBody({
   onPatch,
   onDelete,
   onConnectionPatch,
+  onBulkPaste,
   flashSigId = null,
   pasteFlash,
 }: {
+  mapId: string;
   system: MapSystemNode;
   signatures: MapSignature[];
   connections: MapConnectionEdge[];
@@ -633,6 +677,7 @@ function SignaturePanelBody({
   onPatch: (signatureId: string, patch: UpdateSignatureBody) => void;
   onDelete: (signatureId: string) => void;
   onConnectionPatch: (connectionId: string, patch: UpdateConnectionBody) => void;
+  onBulkPaste: (payloads: MapEventPayload[]) => void;
   flashSigId?: string | null;
   pasteFlash?: Record<string, 'created' | 'updated'>;
 }) {
@@ -716,6 +761,38 @@ function SignaturePanelBody({
     [onConnectionPatch],
   );
 
+  const [resolvingSigId, setResolvingSigId] = useState<string | null>(null);
+
+  /**
+   * Resolve a fixed-destination hole (e.g. J377 → Turnur): the server places the
+   * destination node + a `wh` connection and returns its id; the client then
+   * links the sig to that connection exactly like a manual "Leads to" pick. Skips
+   * the link if the connection is already claimed by another sig (1:1 binding).
+   */
+  const handleResolve = useCallback(
+    async (sig: MapSignature) => {
+      setResolvingSigId(sig.id);
+      try {
+        const res = await resolveSignatureDestinationOnServer({ mapId, sigId: sig.id });
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        onBulkPaste(res.data.payloads);
+        const connId = res.data.connectionId;
+        const boundElsewhere = rows.some((s) => s.id !== sig.id && s.mapConnectionId === connId);
+        if (!boundElsewhere && sig.mapConnectionId !== connId) {
+          onPatch(sig.id, { mapConnectionId: connId });
+          syncConnectionSize(sig.typeId, connId);
+          syncConnectionEol(sig.eolStage, connId);
+        }
+      } finally {
+        setResolvingSigId(null);
+      }
+    },
+    [mapId, rows, onBulkPaste, onPatch, syncConnectionSize, syncConnectionEol],
+  );
+
   const [sorting, setSorting] = useState<SortingState>([{ id: 'sigId', desc: false }]);
 
   const table = useReactTable({
@@ -737,6 +814,8 @@ function SignaturePanelBody({
       syncConnectionEol,
       metaByTypeId,
       assignedConnectionIds,
+      resolveDestination: handleResolve,
+      resolvingSigId,
     } satisfies SignatureTableMeta,
   });
 

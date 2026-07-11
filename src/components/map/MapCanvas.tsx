@@ -2016,6 +2016,7 @@ export function MapCanvas({
       case 'signatures':
         return (
           <SignatureModule
+            mapId={mapId}
             system={selectedSystem}
             signatures={viewData.signatures}
             connections={viewData.connections}
@@ -2024,6 +2025,7 @@ export function MapCanvas({
             onPatch={onSignaturePatch}
             onDelete={onSignatureDelete}
             onConnectionPatch={onConnectionPatch}
+            onBulkPaste={onSignaturePasteResult}
             flashSigId={flashSigId}
             pasteFlash={pasteFlash}
           />
