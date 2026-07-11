@@ -189,13 +189,20 @@ describe.skipIf(!run)(`universe ingest gate (SDE build ${SDE_BUILD})`, () => {
   // WH-type suggestion). Thera (class 12) derives to `C12`, so a hole leading to
   // Thera (e.g. F135) must carry target_class = `C12`, not the literal `Thera`.
   it('catalog class tokens match universe_system.security for Thera (F135 leads to C12)', async () => {
-    const row = await scalar<{ targetClass: string | null; theraSecurity: string | null }>(sql`
+    const row = await scalar<{
+      targetClass: string | null;
+      targetSystemId: number | null;
+      theraSecurity: string | null;
+    }>(sql`
       SELECT
         (SELECT target_class FROM universe_wormhole WHERE name = 'F135') AS "targetClass",
+        (SELECT target_system_id FROM universe_wormhole WHERE name = 'F135') AS "targetSystemId",
         (SELECT security FROM universe_system WHERE id = 31000005) AS "theraSecurity"`);
     // Thera's derived class drives the expectation, so this is robust to the exact label.
     expect(row.theraSecurity).toBe('C12');
     expect(row.targetClass).toBe(row.theraSecurity);
+    // Thera is the sole C12 system, so F135 pins it as a fixed destination.
+    expect(row.targetSystemId).toBe(31000005);
 
     // No catalog row may use the Pathfinder-era literal `Thera` token in either column.
     const stray = await scalar<{ n: number }>(sql`
@@ -208,18 +215,32 @@ describe.skipIf(!run)(`universe ingest gate (SDE build ${SDE_BUILD})`, () => {
   // in systems with a Jove Observatory. That presence isn't in the SDE, so their
   // source is broadened to the full k-space set (H/L/0.0) rather than left null —
   // a null source would offer them everywhere (incl. J-space) via the class filter.
-  it('scopes the Drifter holes to k-space source classes', async () => {
+  it('scopes the Drifter holes to k-space source and pins their Drifter destination', async () => {
     const rows = await db.execute(sql`
-      SELECT name, source_classes AS "sourceClasses", target_class AS "targetClass"
+      SELECT name, source_classes AS "sourceClasses", target_class AS "targetClass",
+             target_system_id AS "targetSystemId"
       FROM universe_wormhole
       WHERE name IN ('B735', 'C414', 'R259', 'S877', 'V928')
       ORDER BY name`);
-    const drifters = rows.rows as { name: string; sourceClasses: string[] | null; targetClass: string | null }[];
+    const drifters = rows.rows as {
+      name: string;
+      sourceClasses: string[] | null;
+      targetClass: string | null;
+      targetSystemId: number | null;
+    }[];
+    // code → [Drifter class, Drifter system id]; first-letter mnemonic
+    // (B→Barbican, C→Conflux, R→Redoubt, S→Sentinel, V→Vidette).
+    const expected: Record<string, [string, number]> = {
+      B735: ['C15', 31000002],
+      C414: ['C17', 31000004],
+      R259: ['C18', 31000006],
+      S877: ['C14', 31000001],
+      V928: ['C16', 31000003],
+    };
     expect(drifters.map((r) => r.name)).toEqual(['B735', 'C414', 'R259', 'S877', 'V928']);
     for (const r of drifters) {
       expect([...(r.sourceClasses ?? [])].sort()).toEqual(['0.0', 'H', 'L']);
-      // Drifter destination classes (C14–C18) aren't in Aperture's vocabulary.
-      expect(r.targetClass).toBeNull();
+      expect([r.targetClass, r.targetSystemId]).toEqual(expected[r.name]);
     }
   });
 });

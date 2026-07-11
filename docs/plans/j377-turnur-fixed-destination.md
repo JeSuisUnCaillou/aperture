@@ -83,7 +83,11 @@
 - Stages 1 and 2 are independently shippable and harmless on their own (data + display only). Stage 3 is where behavior changes — keep it gated behind the explicit affordance so a half-done Stage 3 never auto-mutates maps.
 - Don't widen scope to "any fixed-destination hole framework" beyond what J377 needs — `target_system_id` already *is* the general mechanism; J377 is simply its first row. Future Turnur-style holes slot in as data with no further schema work.
 
-## Follow-up — drifter holes leak through the leads-to back-filter (issue #208)
+## Follow-up — drifter holes leak through the leads-to back-filter (issue #208) — RESOLVED
+
+**Resolved** alongside J492 (#212): the five Drifter holes now carry an accurate destination in `wormhole-classes.csv` (`target_class` = their Drifter class C14–C18, `target_system_id` = their complex), so the #208 back-filter excludes them for mismatched classes with no filter-code change. The five `C12` holes were pinned to Thera in the same pass. Original analysis retained below.
+
+
 
 `WormholeTypeSelect` back-filters the picker to types consistent with the bound leads-to connection's class (issue #208, shipped). The filter keeps any hole whose `targetClass` is null, because null means "resolves from the far side" (K162). The drifter/shattered-access holes — **B735, C414, R259, S877, V928** — carry a null `targetClass` in `wormhole-classes.csv` (`B735;H|L|0.0;` = source `H|L|0.0`, target unset), so the filter can't exclude them: they surface in the default list for *any* destination class (e.g. a regular C1), which is confusing.
 

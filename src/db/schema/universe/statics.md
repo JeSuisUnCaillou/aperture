@@ -16,7 +16,7 @@
 | type_id | int PK | FK → universe_type, CASCADE |
 | name | text NOT NULL | WH code, e.g. `A239`, `K162` |
 | source_classes | text[] | set of classes it can spawn in (`C1`–`C6`, `C12` Thera, `C13` shattered, `H`, `L`, `0.0`); same vocabulary as `universe_system.security` (`deriveSecurityLabel`) — Thera is `C12`, not the literal `Thera`. e.g. S199 = `{L, 0.0}`. `null` = anoik leaves source unspecified |
-| target_class | text | class it leads into; `null` = unknown / unmodeled (K162, Drifter destinations) |
+| target_class | text | class it leads into; `null` = resolved from the far side / unmodeled (e.g. `K162`) |
 | target_system_id | int | FK → `universe_system` **RESTRICT**, nullable; the exact far-end system for fixed-destination holes (e.g. J377 → Turnur); `null` for normal holes whose destination is unknown until scanned |
 
 - Class-only catalog for mass/lifetime/scan-strength, which stay dogma-sourced (`universe_type_attribute` + `universe_type_override` via the effective view); this table vendors the navigationally-missing source/target class labels, plus `target_system_id` for the holes that pin one specific destination (migration 0054).
