@@ -375,3 +375,77 @@ describe('WormholeTypeSelect — destination back-filter', () => {
     expect(itemValues()).toContain('12');
   });
 });
+
+describe('WormholeTypeSelect — fixed-destination labels', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  // Fixed-destination holes: J377 pins Turnur (a normal k-space system), B735
+  // pins the Drifter Barbican complex (id 31000002 in DRIFTER_SYSTEMS). Both
+  // spawn k-space-side (null source → matchesClass), so they render by default.
+  const J377_TURNUR = makeEntry(20, 'J377', {
+    sourceClasses: null,
+    targetClass: 'L',
+    targetSystemId: 30002086,
+    targetSystemName: 'Turnur',
+  });
+  const B735_BARBICAN = makeEntry(21, 'B735', {
+    sourceClasses: null,
+    targetClass: 'C15',
+    targetSystemId: 31000002,
+    targetSystemName: 'Liberated Barbican',
+  });
+  const NORMAL_N110 = makeEntry(22, 'N110', { sourceClasses: ['C3'], targetClass: 'H' });
+
+  beforeEach(() => {
+    (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.clearAllMocks();
+    mockPrefs.mockReturnValue({ grouped: true });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  function resolvedOptions(options: WormholeCatalogEntry[]) {
+    mockFetch.mockResolvedValue({ ok: true, data: options });
+  }
+
+  function itemText(typeId: number): string {
+    const el = container.querySelector<HTMLElement>(`[data-value="${typeId}"]`);
+    return el?.textContent ?? '';
+  }
+
+  it('shows the pinned system name for a fixed-destination hole, not its class', async () => {
+    resolvedOptions([J377_TURNUR]);
+    renderSelect(container, root);
+    await act(async () => {});
+
+    const text = itemText(20);
+    expect(text).toContain('Turnur');
+    // The bare class letter is not surfaced in place of the name.
+    expect(text).not.toMatch(/\bL\b/);
+  });
+
+  it('shows the Drifter short name for a Drifter hole, not the full lore name', async () => {
+    resolvedOptions([B735_BARBICAN]);
+    renderSelect(container, root);
+    await act(async () => {});
+
+    const text = itemText(21);
+    expect(text).toContain('Barbican');
+    expect(text).not.toContain('Liberated');
+  });
+
+  it('shows the target class for a normal hole', async () => {
+    resolvedOptions([NORMAL_N110]);
+    renderSelect(container, root);
+    await act(async () => {});
+
+    expect(itemText(22)).toContain('H');
+  });
+});

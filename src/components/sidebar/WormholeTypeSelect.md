@@ -15,7 +15,7 @@
 | triggerClassName | string | no | Merged onto the `SelectTrigger` (via `cn`) — used by `SignatureModule` to flatten the pill styling in-table. |
 
 ### Renders
-A `Select` populated with WH codes (e.g. "A239", "K162"). Each option uses a flex `justify-between` layout: WH name on the left, destination class on the right, rendered bold and color-coded via `systemClassColor` — the same palette the map uses for system-node statics. The closed trigger mirrors this layout (name left, color-coded class pushed to the right edge) via a `SelectValue` render function given `flex-1` so it stretches the full trigger width. The first item is a sentinel "Select type…" that maps to `null`.
+A `Select` populated with WH codes (e.g. "A239", "K162"). Each option uses a flex `justify-between` layout: WH name on the left, destination on the right, rendered bold and color-coded via `systemClassColor(targetClass)` — the same palette the map uses for system-node statics. The destination text is the target **class** label for a normal hole, but a fixed-destination hole (J377 → Turnur, the Thera and Drifter holes) shows its pinned **system name**; Drifter systems resolve to their community short name (Barbican, Conflux, …) via `systemDisplayName`. Colour stays keyed off `targetClass` so Turnur reads as low-sec orange. The closed trigger mirrors this layout (name left, color-coded destination pushed to the right edge) via a `SelectValue` render function given `flex-1` so it stretches the full trigger width. The first item is a sentinel "Select type…" that maps to `null`.
 
 Layout follows the device-local `wormholePickerPrefs` (`grouped`), subscribed live via `useSyncExternalStore`.
 
@@ -42,6 +42,7 @@ Option rows and the popup are vertically compacted (`py-1` items, `p-0.5` conten
 - Treats the sentinel value `__none__` as null in both directions.
 
 ### Module-level helpers
+- `destinationLabel(opt)` — the right-hand destination text: the Drifter short name / pinned system name for a fixed-destination hole (via `systemDisplayName`), else `opt.targetClass`.
 - `OptionDivider` — thin `<div>` that renders the horizontal separator between groups; declared at module scope (not inside the component) to satisfy the `react-hooks/static-components` rule.
 - `GroupHeader` — the uppercase muted section-title row; module scope for the same rule.
 
@@ -51,4 +52,5 @@ Option rows and the popup are vertically compacted (`py-1` items, `p-0.5` conten
 - `annotateWormholeTypes`, `partitionWormholeOptions`, `subgroupByClass`, `WormholeCatalogEntry` from `@/lib/map/wormholeCatalog`
 - `readWhPickerPrefs`, `getServerWhPickerPrefs`, `subscribeWhPickerPrefs` from `@/lib/wormholePickerPrefs`
 - `systemClassColor` from `@/components/map/styling` — destination-class color coding
+- `systemDisplayName` from `@/lib/eve/drifterSystems` — Drifter short name for a pinned destination
 - `WormholeTypeOption` from `@/types`

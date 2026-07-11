@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { fetchWormholeCatalog } from '@/lib/map/client';
 import { systemClassColor } from '@/components/map/styling';
+import { systemDisplayName } from '@/lib/eve/drifterSystems';
 import {
   annotateWormholeTypes,
   partitionWormholeOptions,
@@ -32,6 +33,17 @@ import {
 import type { WormholeTypeOption } from '@/types';
 
 const NONE_VALUE = '__none__';
+
+// The destination shown on the right of a WH option: a fixed-destination hole
+// (J377 → Turnur, Thera/Drifter holes) names its pinned system; every other
+// hole shows its target class label. Drifter systems resolve to their community
+// short name (Barbican, Conflux, …) via `systemDisplayName`; every other system
+// keeps its catalog name. Colour is always keyed off the class so Turnur still
+// reads as low-sec orange.
+function destinationLabel(opt: WormholeTypeOption): string | null {
+  if (opt.targetSystemName == null || opt.targetSystemId == null) return opt.targetClass;
+  return systemDisplayName(opt.targetSystemId, opt.targetSystemName);
+}
 
 function OptionDivider() {
   return <div className="my-0.5 h-px bg-border" />;
@@ -165,12 +177,12 @@ export function WormholeTypeSelect({
     <SelectItem className="py-1" key={opt.typeId} value={String(opt.typeId)}>
       <span className="flex w-full justify-between gap-4">
         <span>{opt.name}</span>
-        {opt.targetClass && (
+        {destinationLabel(opt) && (
           <span
             className="shrink-0 font-bold"
             style={{ color: systemClassColor(opt.targetClass) }}
           >
-            {opt.targetClass}
+            {destinationLabel(opt)}
           </span>
         )}
       </span>
@@ -220,12 +232,12 @@ export function WormholeTypeSelect({
             return (
               <span className="flex min-w-0 flex-1 items-center justify-between gap-4">
                 <span className="truncate">{opt.name}</span>
-                {opt.targetClass && (
+                {destinationLabel(opt) && (
                   <span
                     className="shrink-0 font-bold"
                     style={{ color: systemClassColor(opt.targetClass) }}
                   >
-                    {opt.targetClass}
+                    {destinationLabel(opt)}
                   </span>
                 )}
               </span>
