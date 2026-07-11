@@ -80,8 +80,14 @@ The tag must point at the published commit on `master`, not at a dev commit.
 
 ```sh
 git tag v<version>
-git push origin master --follow-tags
+git push origin master
+git push origin v<version>
 ```
+
+Push the tag as its own command. `git tag v<version>` creates a **lightweight** tag,
+and `git push --follow-tags` only carries **annotated** tags — so folding the tag into the
+branch push with `--follow-tags` silently leaves it local, and the GitHub release in step 4
+then fails to find it. Push the tag ref explicitly.
 
 ### 4. Create the GitHub release
 
