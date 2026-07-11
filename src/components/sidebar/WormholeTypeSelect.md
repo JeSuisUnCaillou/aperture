@@ -12,6 +12,7 @@
 | onValueChange | (next: number \| null) => void | yes | Fires when the user picks a different option. |
 | disabled | boolean | no | Disables the trigger. |
 | destinationClass | string \| null | no | The bound leads-to connection's far-end class label. When set, back-filters the list to types whose `targetClass` matches it; null/absent = no destination constraint. |
+| destinationSystemId | number \| null | no | The bound leads-to connection's far-end `universe_system.id`. A fixed-destination hole (`targetSystemId` set) is kept by the back-filter only when this equals its pinned `targetSystemId`. |
 | triggerClassName | string | no | Merged onto the `SelectTrigger` (via `cn`) — used by `SignatureModule` to flatten the pill styling in-table. |
 
 ### Renders
@@ -35,7 +36,7 @@ Option rows and the popup are vertically compacted (`py-1` items, `p-0.5` conten
 
 ### Behaviour & Interactions
 - On mount, calls `fetchWormholeCatalog()` — the static catalog is fetched **once per session** and shared by every dropdown (no per-system fetch). The component then derives this system's options with `annotateWormholeTypes(catalog, { security, staticTypeIds })` in a `useMemo`.
-- **Destination back-filter:** when `destinationClass` is set (the far-end class of a bound leads-to connection), only the **default-visible sections** are narrowed to types whose `targetClass` equals it — plus any null-target hole (`K162` and the like) that resolves from the far side, and the current `value` (so a mismatched existing selection still renders in its section). The `others`/`Show all` fallback is left unconstrained, so the full catalog stays reachable. This is the reverse of `ConnectionSelect`'s type→leads-to filter, so the two stay mutually consistent whichever side is set first. Alphabetical mode renders the full unfiltered list (its own escape hatch), so the back-filter applies to grouped mode only.
+- **Destination back-filter:** when `destinationClass` is set (the far-end class of a bound leads-to connection), only the **default-visible sections** are narrowed to types whose `targetClass` equals it — plus any null-target hole (`K162` and the like) that resolves from the far side, and the current `value` (so a mismatched existing selection still renders in its section). A **fixed-destination hole** (`targetSystemId` set, e.g. J377 → Turnur) is kept only when `destinationSystemId` equals its pinned `targetSystemId`, never merely a same-class destination — so J377/J492 surface only when the leads-to is their own pinned system. The `others`/`Show all` fallback is left unconstrained, so the full catalog stays reachable. This is the reverse of `ConnectionSelect`'s type→leads-to filter, so the two stay mutually consistent whichever side is set first. Alphabetical mode renders the full unfiltered list (its own escape hatch), so the back-filter applies to grouped mode only.
 - Subscribes to `wormholePickerPrefs` via `useSyncExternalStore`; a toggle flipped in Map Settings re-renders every open picker live.
 - `showAll` (local) gates the "others" group; collapsed by default. The parent re-mount also resets this naturally.
 - Disables itself during the initial load.

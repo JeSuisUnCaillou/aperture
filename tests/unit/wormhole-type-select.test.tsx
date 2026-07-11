@@ -376,6 +376,110 @@ describe('WormholeTypeSelect — destination back-filter', () => {
   });
 });
 
+describe('WormholeTypeSelect — fixed-destination back-filter', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  // Both J377 and J492 are low-sec-target (`L`) fixed-destination holes, pinned
+  // to different systems: J377 → Turnur (30002086), J492 → Tabbetzur (30002080).
+  // A plain wandering low-sec hole (null target system) shares the class.
+  const J377_TURNUR = makeEntry(30, 'J377', {
+    sourceClasses: null,
+    targetClass: 'L',
+    targetSystemId: 30002086,
+    targetSystemName: 'Turnur',
+  });
+  const J492_TABBETZUR = makeEntry(31, 'J492', {
+    sourceClasses: null,
+    targetClass: 'L',
+    targetSystemId: 30002080,
+    targetSystemName: 'Tabbetzur',
+  });
+  const WANDERING_TO_LOWSEC = makeEntry(32, 'N290', { sourceClasses: ['C3'], targetClass: 'L' });
+
+  const KAMELA_ID = 30002053;
+
+  beforeEach(() => {
+    (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.clearAllMocks();
+    mockPrefs.mockReturnValue({ grouped: true });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  function resolvedOptions(options: WormholeCatalogEntry[]) {
+    mockFetch.mockResolvedValue({ ok: true, data: options });
+  }
+
+  function itemValues(): string[] {
+    return Array.from(container.querySelectorAll<HTMLElement>('[data-slot="select-item"]'))
+      .map((el) => el.dataset.value ?? '')
+      .filter(Boolean);
+  }
+
+  function renderWith(destinationClass: string | null, destinationSystemId: number | null) {
+    act(() => {
+      root.render(
+        <WormholeTypeSelect
+          systemSecurity={SYSTEM_SECURITY}
+          staticTypeIds={SYSTEM_STATIC_TYPE_IDS}
+          value={null}
+          onValueChange={vi.fn()}
+          destinationClass={destinationClass}
+          destinationSystemId={destinationSystemId}
+        />,
+      );
+    });
+  }
+
+  it('keeps a fixed-destination hole only when the far end is its pinned system', async () => {
+    resolvedOptions([J377_TURNUR, J492_TABBETZUR, WANDERING_TO_LOWSEC]);
+    renderWith('L', 30002086); // destination is Turnur
+    await act(async () => {});
+
+    const values = itemValues();
+    expect(values).toContain('30'); // J377 → Turnur, matches
+    expect(values).not.toContain('31'); // J492 → Tabbetzur, wrong system
+    expect(values).toContain('32'); // plain low-sec hole still matches on class
+  });
+
+  it('drops both fixed-destination holes when a same-class system is not their destination', async () => {
+    resolvedOptions([J377_TURNUR, J492_TABBETZUR, WANDERING_TO_LOWSEC]);
+    renderWith('L', KAMELA_ID); // Kamela is low-sec but neither hole's pin
+    await act(async () => {});
+
+    const values = itemValues();
+    expect(values).not.toContain('30'); // J377 → Turnur, not Kamela
+    expect(values).not.toContain('31'); // J492 → Tabbetzur, not Kamela
+    expect(values).toContain('32'); // wandering low-sec hole is class-matched
+  });
+
+  it('surfaces a filtered-out fixed-destination hole behind the show-all fallback', async () => {
+    resolvedOptions([J377_TURNUR, WANDERING_TO_LOWSEC]);
+    renderWith('L', KAMELA_ID);
+    await act(async () => {});
+
+    expect(itemValues()).not.toContain('30');
+
+    const button = Array.from(container.querySelectorAll('button')).find((b) =>
+      /show all types/i.test(b.textContent ?? ''),
+    );
+    expect(button).toBeTruthy();
+
+    act(() => {
+      button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(itemValues()).toContain('30');
+  });
+});
+
 describe('WormholeTypeSelect — fixed-destination labels', () => {
   let container: HTMLDivElement;
   let root: Root;

@@ -70,6 +70,7 @@ export function WormholeTypeSelect({
   onValueChange,
   disabled,
   destinationClass,
+  destinationSystemId,
   triggerClassName,
 }: {
   /** Host system's class label (`MapSystemNode.security`) — drives `matchesClass`. */
@@ -88,6 +89,12 @@ export function WormholeTypeSelect({
    * selection still renders in the trigger.
    */
   destinationClass?: string | null;
+  /**
+   * The bound leads-to connection's far-end `universe_system.id`. A
+   * fixed-destination hole (J377 → Turnur) is kept by the back-filter only when
+   * this matches its pinned `targetSystemId`, never merely a same-class system.
+   */
+  destinationSystemId?: number | null;
   triggerClassName?: string;
 }) {
   // Combine `loading` and `catalog` in one state object so the effect body only
@@ -131,13 +138,20 @@ export function WormholeTypeSelect({
     return labels;
   }, [options]);
 
-  // A type is consistent with the bound leads-to when it opens onto that class,
-  // resolves from the far side (null target, e.g. K162), or is the current
-  // selection (kept so a mismatched existing pick still renders in its section).
+  // A type is consistent with the bound leads-to when it is the current
+  // selection (kept so a mismatched existing pick still renders in its section),
+  // resolves from the far side (null target, e.g. K162), or opens onto the far
+  // end. A fixed-destination hole (`targetSystemId` set) matches only its exact
+  // pinned system — J377 → Turnur, not any low-sec; every other hole matches on
+  // the destination class.
   const destinationConsistent = useCallback(
-    (opt: WormholeTypeOption) =>
-      opt.targetClass == null || opt.targetClass === destinationClass || opt.typeId === value,
-    [destinationClass, value],
+    (opt: WormholeTypeOption) => {
+      if (opt.typeId === value) return true;
+      if (opt.targetSystemId != null) return opt.targetSystemId === destinationSystemId;
+      if (opt.targetClass == null) return true;
+      return opt.targetClass === destinationClass;
+    },
+    [destinationClass, destinationSystemId, value],
   );
 
   // Default-visible semantic groups (statics pinned, K162, class-matched

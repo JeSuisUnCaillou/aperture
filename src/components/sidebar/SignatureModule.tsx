@@ -130,21 +130,22 @@ function defaultExpiry(): string {
 }
 
 /**
- * The class label of the system on the far end of a bound connection, used to
- * back-filter the WH-type picker to types that could open onto it. Null when no
- * connection is bound or the far end's class is unknown.
+ * The system on the far end of a bound connection, used to back-filter the
+ * WH-type picker to types that could open onto it (its class label, and — for
+ * fixed-destination holes — its exact `systemId`). Null when no connection is
+ * bound or the far end isn't on the map.
  */
-function connectionFarClass(
+function connectionFarSystem(
   connectionId: string | null,
   system: MapSystemNode,
   connections: MapConnectionEdge[],
   systems: MapSystemNode[],
-): string | null {
+): MapSystemNode | null {
   if (connectionId == null) return null;
   const conn = connections.find((c) => c.id === connectionId);
   if (!conn) return null;
   const otherId = conn.source === system.id ? conn.target : conn.source;
-  return systems.find((s) => s.id === otherId)?.security ?? null;
+  return systems.find((s) => s.id === otherId) ?? null;
 }
 
 function formatAgoIso(iso: string): string {
@@ -273,6 +274,7 @@ function TypeColumnCell({ row, table }: CellContext<MapSignature, unknown>) {
   const typeMissing =
     sig.groupKey !== null &&
     (sig.groupKey === 'wormhole' ? sig.typeId === null : !sig.name);
+  const far = connectionFarSystem(sig.mapConnectionId, system, connections, systems);
   return (
     <div className={`px-1 py-px${typeMissing ? ` ${MISSING_CELL}` : ''}`}>
       <TypeCell
@@ -280,7 +282,8 @@ function TypeColumnCell({ row, table }: CellContext<MapSignature, unknown>) {
         sig={sig}
         onPatch={onPatch}
         onSyncConnectionSize={syncConnectionSize}
-        destinationClass={connectionFarClass(sig.mapConnectionId, system, connections, systems)}
+        destinationClass={far?.security ?? null}
+        destinationSystemId={far?.systemId ?? null}
         triggerClassName={FLAT_TRIGGER}
         inputClassName={FLAT_INPUT}
       />
@@ -851,6 +854,8 @@ function SignaturePanelBody({
     setDraftEolStage('none');
   }
 
+  const draftFar = connectionFarSystem(draftConnectionId, system, connections, systems);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <SignatureFilterBar
@@ -947,7 +952,8 @@ function SignaturePanelBody({
               staticTypeIds={system.staticTypeIds}
               value={draftTypeId}
               onValueChange={setDraftTypeId}
-              destinationClass={connectionFarClass(draftConnectionId, system, connections, systems)}
+              destinationClass={draftFar?.security ?? null}
+              destinationSystemId={draftFar?.systemId ?? null}
             />
           ) : draftGroupKey === null ? (
             <Input className="h-8" placeholder="Pick a group first" disabled />
@@ -1002,6 +1008,7 @@ function TypeCell({
   onPatch,
   onSyncConnectionSize,
   destinationClass,
+  destinationSystemId,
   triggerClassName,
   inputClassName,
 }: {
@@ -1010,6 +1017,7 @@ function TypeCell({
   onPatch: (signatureId: string, patch: UpdateSignatureBody) => void;
   onSyncConnectionSize: (typeId: number | null, connectionId: string | null) => void;
   destinationClass: string | null;
+  destinationSystemId: number | null;
   triggerClassName?: string;
   inputClassName?: string;
 }) {
@@ -1033,6 +1041,7 @@ function TypeCell({
           onSyncConnectionSize(typeId, sig.mapConnectionId);
         }}
         destinationClass={destinationClass}
+        destinationSystemId={destinationSystemId}
         triggerClassName={triggerClassName}
       />
     );
