@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.0.0-rc.14
+
+Aperture now understands fixed-destination wormholes and can resolve one onto the map in a single click. Plus a batch of wormhole-picker polish, a terminal EOL stage, and three fixes.
+
+### New features
+
+- **Fixed-destination wormholes** - holes that always exit to the same system now resolve onto the map in one click from the signature, no far-side scout needed. Seeded: J377 to Turnur, J492 to Tabbetzur, the C12 holes to Thera, and the Drifter holes to their complexes. Resolution is one-directional (a K162 never resolves). *(MonoliYoda)*
+- **"Expired" EOL stage** - a fourth terminal stage (none to eol to critical to expired) set manually by scouts. Shows an elapsed readout ("Expired 3h ago"), renders red, and is reaped by the EOL-expiry job. *(MonoliYoda)*
+
+### Improvements
+
+- **Wormhole picker back-filter** - when a leads-to connection is set, the type picker narrows to types that fit its far-end class, with fixed-destination holes matched to their exact pinned system and shown by destination name. K162 and "Show all types" keep every type reachable. *(MonoliYoda)*
+- **Wormhole picker grouped ordering** - the type picker now orders wandering and frigate holes by destination class, with a setting to switch back to alphabetical. *(MonoliYoda)*
+- **Paste highlight** - rows a paste creates or updates briefly ping (green created, blue updated), visible only to the pilot who pasted. *(MonoliYoda)*
+
+### Fixes
+
+- **Transit-signature prompt race** - the new-hole prompt no longer misses when the jump breadcrumb beats the map fold; jumps are buffered until the fold lands. *(MonoliYoda)*
+- **DB-down logins** now surface as a server error with a try-again message instead of a misleading "access denied". Still fails closed. *(MonoliYoda)*
+- **zKillboard phantom flashes** - fixed both causes (cursor-null seed bug and a stale-feed freshness gap). *(MonoliYoda)*
+
+### Contributors
+
+- **MonoliYoda** - fixed-destination wormholes, expired EOL stage, wormhole-picker filtering and ordering, paste highlight, and the transit-prompt, login-gate and zKillboard fixes
+
 ## v1.0.0-rc.13
 
 A small maintenance release on top of rc.12: renamed characters now pick up their new name without a re-login, and the zKillboard feed gained operational logging to make spurious system-kill flashes traceable.
