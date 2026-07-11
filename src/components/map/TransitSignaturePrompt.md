@@ -19,10 +19,12 @@ A small dismissible `Card` pinned to the canvas top-left (`absolute left-2 top-2
 
 ### Behaviour & Interactions
 - Subscribes via `useTraversals`; ignores jumps whose `characterId` isn't one of `viewerCharacters` (the matched character's `name` is shown in the prompt title).
-- Ignores the jump unless the source system is on the map, the two systems have no `stargate` connection between them, and a `wh`-scope connection between them exists (the server-folded hole).
-- Suppressed for already-mapped holes: if any signature is already bound to the folded `wh` connection, the prompt never opens (re-jumping or an alt re-traversing a populated hole stays silent).
-- Dedupes by `from→to` EVE-system key, so a fleet jumping the same hole shows one prompt.
-- On open, loads the `typeId → targetClass` and `typeId → jumpMassClass` maps via `fetchWormholeCatalog` (system-independent catalog facts; shared session-wide cache, usually warm) — the first filters candidates, the second drives the connection-size auto-set.
+- A qualifying jump needs the source and destination on the map, no `stargate` connection between them, and a `wh`-scope connection between them (the server-folded hole). A `stargate` link between the two ⇒ gate jump, never prompts.
+- **Buffered against the fold-vs-breadcrumb race.** The `characterUpdate` that fires the traversal can arrive before the `connection.create` it was broadcast after has folded into client state. Every viewer jump (except gate/already-mapped ones) is recorded in the `pending` buffer; the displayed prompt is *derived each render* by resolving buffered jumps against live props (`systems`/`connections`/`signatures`), so a jump surfaces the moment its fold lands — whether that's the same render or a beat later. A timer prunes a jump whose fold never arrives within `BUFFER_TTL_MS` (3s); a jump that has become resolvable (shown) is exempt, so the TTL bounds only the wait, and a shown prompt persists until acted on.
+- A new traversal by a pilot supersedes that pilot's own still-buffered jump (a pilot is only ever in one place); buffered entries dedupe by `from→to` EVE-system key, so a fleet jumping the same hole shows one prompt.
+- One prompt shows at a time (the first resolvable buffered jump); a second resolvable jump waits for the current one to clear.
+- Suppressed for already-mapped holes: a jump whose `wh` connection has a signature bound to it resolves to `drop` and never shows, re-evaluated every render so a hole mapped while a jump sat buffered never prompts. Clicking a candidate binds a sig and thus self-suppresses; dismissing (the `X`) removes only that buffered jump with no lasting suppression, so a later tracked jump of a still-unmapped hole prompts again.
+- While a prompt is shown, loads the `typeId → targetClass` and `typeId → jumpMassClass` maps via `fetchWormholeCatalog` (system-independent catalog facts; shared session-wide cache, usually warm) — the first filters candidates, the second drives the connection-size auto-set.
 - Candidates (pure `transitCandidates` helper): source-system `wormhole` sigs **not already bound to any connection**, whose type's `targetClass` matches the destination class, or whose type leads anywhere (K162 / `targetClass == null`), or which have no type set (`typeId == null`).
 - Clicking a candidate calls `onPatchSignature(sig.id, { mapConnectionId })`, then — when the sig already carries a type with an inferable band — `onConnectionPatch(connectionId, { jumpMassClass })` (e.g. B274 → M), then — when the sig carries a non-`none` EOL stage (`sig.eolStage`) — `onConnectionPatch(connectionId, { eolStage: sig.eolStage })`, then dismisses. Never sets the sig's `typeId` — destination class alone can't identify the exact WH code.
 - Filaments and unscanned sources yield zero candidates ⇒ nothing renders.
@@ -42,5 +44,6 @@ A small dismissible `Card` pinned to the canvas top-left (`absolute left-2 top-2
 
 ### Local State
 - `prompt: Prompt | null` — the active jump being asked about.
+- `pending: PendingJump[]` — viewer jumps buffered while their fold catches up to client state; the shown prompt is derived from this list each render, and a timer prunes entries whose fold never lands within `BUFFER_TTL_MS`.
 - `targetClassByTypeId: Map<number, string | null>` — loaded WH-type catalog for the source system.
 - `jumpMassByTypeId: Map<number, WhJumpMass | null>` — per-type inferred jump-mass band for the connection-size auto-set.

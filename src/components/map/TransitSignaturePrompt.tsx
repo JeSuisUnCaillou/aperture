@@ -46,6 +46,78 @@ type Prompt = {
   connectionId: string;
 };
 
+/** A viewer jump waiting for its folded systems/connection to reach client state. */
+type PendingJump = {
+  key: string;
+  characterId: number;
+  characterName: string;
+  fromSystemId: number;
+  toSystemId: number;
+  /** ms epoch the jump was observed; the entry is forgotten after `BUFFER_TTL_MS`. */
+  at: number;
+};
+
+/** How long a buffered jump waits for its `connection.create` before it's forgotten. */
+const BUFFER_TTL_MS = 3000;
+
+type ResolveResult =
+  | { kind: 'open'; prompt: Prompt }
+  | { kind: 'drop' }
+  | { kind: 'pending' };
+
+/**
+ * Match one viewer jump against current map state. `drop` = a gate link or an
+ * already-mapped hole (never prompt); `open` = a folded, unmapped `wh` hole to
+ * ask about; `pending` = the fold (systems/connection) hasn't reached client
+ * state yet, so the caller should buffer and retry. Reads only its arguments.
+ */
+function resolveJump(
+  jump: { characterName: string; fromSystemId: number; toSystemId: number },
+  systems: MapSystemNode[],
+  connections: MapConnectionEdge[],
+  signatures: MapSignature[],
+): ResolveResult {
+  const source = systems.find((s) => s.systemId === jump.fromSystemId);
+  const dest = systems.find((s) => s.systemId === jump.toSystemId);
+  if (!source || !dest) return { kind: 'pending' };
+  const incident = connections.filter(
+    (c) =>
+      (c.source === source.id && c.target === dest.id) ||
+      (c.source === dest.id && c.target === source.id),
+  );
+  // A gate jump (or any gate link between the two) is never a wormhole transit.
+  if (incident.some((c) => c.scope === 'stargate')) return { kind: 'drop' };
+  const wh = incident.find((c) => c.scope === 'wh');
+  if (!wh) return { kind: 'pending' };
+  // Hole is already mapped (a sig points at this connection) — nothing to ask.
+  if (signatures.some((s) => s.mapConnectionId === wh.id)) return { kind: 'drop' };
+  return {
+    kind: 'open',
+    prompt: {
+      key: `${jump.fromSystemId}->${jump.toSystemId}`,
+      characterName: jump.characterName,
+      sourceMapSystemId: source.id,
+      destLabel: dest.alias ?? dest.name,
+      destClass: dest.security,
+      connectionId: wh.id,
+    },
+  };
+}
+
+/** First buffered jump that currently resolves to an openable prompt, else null. */
+function pickActivePrompt(
+  pending: PendingJump[],
+  systems: MapSystemNode[],
+  connections: MapConnectionEdge[],
+  signatures: MapSignature[],
+): Prompt | null {
+  for (const p of pending) {
+    const resolved = resolveJump(p, systems, connections, signatures);
+    if (resolved.kind === 'open') return resolved.prompt;
+  }
+  return null;
+}
+
 /**
  * "Which signature did you come through?" overlay. Watches the viewer's own
  * pilots via `useTraversals`; when one jumps between two systems that aren't
@@ -72,7 +144,6 @@ export function TransitSignaturePrompt({
   onPatchSignature: (signatureId: string, patch: { mapConnectionId: string }) => void;
   onConnectionPatch: (connectionId: string, patch: UpdateConnectionBody) => void;
 }) {
-  const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [targetClassByTypeId, setTargetClassByTypeId] = useState<Map<number, string | null>>(
     () => new Map(),
   );
@@ -82,9 +153,15 @@ export function TransitSignaturePrompt({
   const [jumpMassByTypeId, setJumpMassByTypeId] = useState<Map<number, WhJumpMass | null>>(
     () => new Map(),
   );
+  // Viewer jumps whose fold hasn't reached client state yet (the `characterUpdate`
+  // breadcrumb can beat the `connection.create` it was broadcast after). The
+  // displayed prompt is derived from this buffer each render; the TTL timer below
+  // prunes any jump whose fold never arrives.
+  const [pending, setPending] = useState<PendingJump[]>([]);
 
   // The traversal callback reads the latest props through this ref so a
-  // re-render (new systems/connections) doesn't re-subscribe the listener.
+  // re-render (new systems/connections) doesn't re-subscribe the listener; the
+  // prune timer reads them the same way.
   const latest = useRef({ systems, connections, signatures, viewerCharacters });
   useEffect(() => {
     latest.current = { systems, connections, signatures, viewerCharacters };
@@ -95,37 +172,46 @@ export function TransitSignaturePrompt({
     const character = viewerCharacters.find((c) => c.id === t.characterId);
     if (!character) return; // only the viewer's own pilots fire the prompt
 
-    const source = systems.find((s) => s.systemId === t.fromSystemId);
-    const dest = systems.find((s) => s.systemId === t.toSystemId);
-    if (!source || !dest) return; // source must be on the map to list its sigs
-
-    const incident = connections.filter(
-      (c) =>
-        (c.source === source.id && c.target === dest.id) ||
-        (c.source === dest.id && c.target === source.id),
+    const key = `${t.fromSystemId}->${t.toSystemId}`;
+    const resolved = resolveJump(
+      { characterName: character.name, fromSystemId: t.fromSystemId, toSystemId: t.toSystemId },
+      systems,
+      connections,
+      signatures,
     );
-    // A gate jump (or any gate link between the two) is never a wormhole transit.
-    if (incident.some((c) => c.scope === 'stargate')) return;
-    const wh = incident.find((c) => c.scope === 'wh');
-    if (!wh) return; // the folded WH connection isn't here yet — skip this jump
-    // Hole is already mapped (a sig points at this connection) — nothing to ask.
-    if (signatures.some((s) => s.mapConnectionId === wh.id)) return;
 
-    setPrompt({
-      key: `${t.fromSystemId}->${t.toSystemId}`,
-      characterName: character.name,
-      sourceMapSystemId: source.id,
-      destLabel: dest.alias ?? dest.name,
-      destClass: dest.security,
-      connectionId: wh.id,
+    // A fresh jump by this pilot supersedes any earlier buffered jump of theirs
+    // (they can only be in one place); also dedupes the from→to key. Buffer
+    // unless it's a gate/already-mapped jump (`drop`); the render derivation
+    // shows it once resolvable, whether that's now or a beat later.
+    setPending((prev) => {
+      const others = prev.filter((p) => p.characterId !== t.characterId && p.key !== key);
+      if (resolved.kind === 'drop') return others;
+      return [
+        ...others,
+        {
+          key,
+          characterId: t.characterId,
+          characterName: character.name,
+          fromSystemId: t.fromSystemId,
+          toSystemId: t.toSystemId,
+          at: Date.now(),
+        },
+      ];
     });
   });
+
+  // Displayed prompt, derived from the buffer against live props (not the ref) so
+  // it reflects a `connection.create` that folded in after the traversal fired.
+  // One shows at a time; a second resolvable jump waits for it to clear.
+  const active = pickActivePrompt(pending, systems, connections, signatures);
+  const activeKey = active?.key ?? null;
 
   // Load the WH-type → target-class / jump-mass maps for filtering. These are
   // system-independent catalog facts, so this hits the shared session-wide WH
   // catalog (same lookup `WormholeTypeSelect` / the sig panel use) — usually warm.
   useEffect(() => {
-    if (!prompt) return;
+    if (!activeKey) return;
     let cancelled = false;
     fetchWormholeCatalog().then((result) => {
       if (cancelled || !result.ok) return;
@@ -135,16 +221,45 @@ export function TransitSignaturePrompt({
     return () => {
       cancelled = true;
     };
-  }, [prompt]);
+  }, [activeKey]);
 
-  const dismiss = useCallback(() => setPrompt(null), []);
+  // Prune jumps whose fold never arrived. A jump that has become resolvable
+  // (shown, `open`) is kept regardless of age — the TTL only bounds *waiting*;
+  // once shown, the prompt persists until acted on. The timer fires at the
+  // soonest pending expiry and re-arms as the buffer changes.
+  useEffect(() => {
+    if (pending.length === 0) return;
+    const soonest = Math.min(...pending.map((p) => p.at)) + BUFFER_TTL_MS;
+    const timer = setTimeout(
+      () => {
+        setPending((prev) => {
+          const { systems, connections, signatures } = latest.current;
+          const next = prev.filter(
+            (p) =>
+              resolveJump(p, systems, connections, signatures).kind === 'open' ||
+              Date.now() - p.at < BUFFER_TTL_MS,
+          );
+          // Return the same reference when nothing expired so React bails out —
+          // a new array would re-render, re-arm this timer at an already-elapsed
+          // expiry, and busy-loop while a resolved prompt sits open.
+          return next.length === prev.length ? prev : next;
+        });
+      },
+      Math.max(0, soonest - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [pending]);
 
-  if (!prompt) return null;
+  const dismiss = useCallback((key: string) => {
+    setPending((prev) => prev.filter((p) => p.key !== key));
+  }, []);
+
+  if (!active) return null;
 
   const candidates = transitCandidates({
     signatures,
-    sourceMapSystemId: prompt.sourceMapSystemId,
-    destClass: prompt.destClass,
+    sourceMapSystemId: active.sourceMapSystemId,
+    destClass: active.destClass,
     targetClassByTypeId,
   });
   if (candidates.length === 0) return null;
@@ -153,7 +268,7 @@ export function TransitSignaturePrompt({
     <Card className="nodrag nopan absolute left-2 top-2 z-10 max-w-xs gap-2 p-3 text-sm shadow-lg">
       <div className="flex items-start justify-between gap-2">
         <span className="font-medium">
-          {prompt.characterName} jumped into {prompt.destLabel} — which signature?
+          {active.characterName} jumped into {active.destLabel} — which signature?
         </span>
         <Button
           type="button"
@@ -161,7 +276,7 @@ export function TransitSignaturePrompt({
           size="icon"
           className="-mr-1 -mt-1 size-6 shrink-0"
           aria-label="Dismiss"
-          onClick={dismiss}
+          onClick={() => dismiss(active.key)}
         >
           <X className="size-4" />
         </Button>
@@ -175,15 +290,15 @@ export function TransitSignaturePrompt({
             size="sm"
             className="justify-between gap-3"
             onClick={() => {
-              onPatchSignature(sig.id, { mapConnectionId: prompt.connectionId });
+              onPatchSignature(sig.id, { mapConnectionId: active.connectionId });
               // Carry the sig type's inferred jump-mass band onto the connection
               // (e.g. B274 → M); skip when the type is unset or can't be inferred.
               const band = sig.typeId == null ? null : jumpMassByTypeId.get(sig.typeId) ?? null;
-              if (band != null) onConnectionPatch(prompt.connectionId, { jumpMassClass: band });
+              if (band != null) onConnectionPatch(active.connectionId, { jumpMassClass: band });
               // Carry a pre-jump EOL stage onto the connection it resolved to.
               if (sig.eolStage !== 'none')
-                onConnectionPatch(prompt.connectionId, { eolStage: sig.eolStage });
-              dismiss();
+                onConnectionPatch(active.connectionId, { eolStage: sig.eolStage });
+              dismiss(active.key);
             }}
           >
             <span className="font-mono">{sig.sigId}</span>
