@@ -12,7 +12,9 @@ import type { MapConnectionEdge } from './loadMap';
  * (`WORMHOLE_EOL_NOMINAL_MS` / `WORMHOLE_EOL_CRITICAL_NOMINAL_MS`). The
  * `eol-expiry` reap job runs on the longer nominal + grace-buffer thresholds
  * (`WORMHOLE_EOL_LIFETIME_MS` / `…_CRITICAL_LIFETIME_MS`) via its own SQL, so a
- * hole reads "expired" here a little before Aperture actually purges it.
+ * hole counts down to zero here a little before Aperture actually purges it. The
+ * manual `expired` stage is separate: no countdown, an elapsed-since readout
+ * (`connectionExpiredSinceMs`).
  */
 
 const { WORMHOLE_EOL_NOMINAL_MS, WORMHOLE_EOL_CRITICAL_NOMINAL_MS, WORMHOLE_DEFAULT_LIFETIME_MS } =
@@ -29,12 +31,15 @@ export type ConnectionLifecycleInput = Pick<
  * applies. A wormhole in the `critical` (1h) stage expires
  * `WORMHOLE_EOL_CRITICAL_NOMINAL_MS` after `eolAt`; in the `eol` (4h) stage,
  * `WORMHOLE_EOL_NOMINAL_MS` after `eolAt`; a non-EOL (`none`) wormhole expires
- * `WORMHOLE_DEFAULT_LIFETIME_MS` after `createdAt`. Stargate / jumpbridge /
- * abyssal connections never expire and return `null`. An EOL stage without an
- * `eolAt` stamp (defensive — a stale client snapshot) also returns `null`.
+ * `WORMHOLE_DEFAULT_LIFETIME_MS` after `createdAt`. The manual `expired` stage
+ * has no timed expiry and returns `null`. Stargate / jumpbridge / abyssal
+ * connections never expire and return `null`. An EOL stage without an `eolAt`
+ * stamp (defensive — a stale client snapshot) also returns `null`.
  */
 export function connectionExpiresAt(c: ConnectionLifecycleInput): Date | null {
   if (c.scope !== 'wh') return null;
+  // The manual terminal stage carries no timed expiry — it is past guaranteed life.
+  if (c.eolStage === 'expired') return null;
   if (c.eolStage === 'none') {
     return new Date(new Date(c.createdAt).getTime() + WORMHOLE_DEFAULT_LIFETIME_MS);
   }
@@ -59,4 +64,22 @@ export function connectionTimeLeftMs(
   const expiresAt = connectionExpiresAt(c);
   if (!expiresAt) return null;
   return Math.max(0, expiresAt.getTime() - now);
+}
+
+/**
+ * Milliseconds elapsed since a wormhole was manually marked `expired`, measured
+ * from `eolAt` (the flag instant). Returns `null` for any other stage / scope,
+ * or when the `expired` stage lacks an `eolAt` stamp. Drives the "Expired X ago"
+ * readout that replaces the countdown on an expired hole.
+ *
+ * **Parameters:**
+ * - `c` — the connection lifecycle fields.
+ * - `now` — clock to compare against (defaults to `Date.now()`; injectable for tests).
+ */
+export function connectionExpiredSinceMs(
+  c: ConnectionLifecycleInput,
+  now: number = Date.now(),
+): number | null {
+  if (c.scope !== 'wh' || c.eolStage !== 'expired' || !c.eolAt) return null;
+  return Math.max(0, now - new Date(c.eolAt).getTime());
 }

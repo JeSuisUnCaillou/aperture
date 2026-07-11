@@ -26,6 +26,7 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 **Third-party integrations (read-side)**
 - `INTEGRATION_REQUEST_TIMEOUT_MS`, `INTEGRATION_USER_AGENT` — shared timeout + UA for zKillboard / EVE-Scout / GitHub.
 - `ZKB_R2Z2_BASE`, `ZKB_FEED_POLL_MS` (≥6s hard floor), `ZKB_FEED_INDEX_REFRESH_MS`, `ZKB_FEED_MAX_CATCHUP` — zKillboard R2Z2 live-feed config.
+- `ZKB_FEED_MAX_KILL_AGE_MS` (10 min) — max age from ESI `killmail_time` a feed kill may have and still flash; older (or undatable) kills are dropped so reprocessed / late-submitted killmails zKB appends to the live sequence don't trigger a phantom underglow.
 - `GITHUB_CHANGELOG_REPO`, `GITHUB_CHANGELOG_REVALIDATE_S` — GitHub releases changelog feed.
 - `KILLMAIL_CACHE_RETENTION_DAYS` (30), `KILLMAIL_CLEANUP_CRON` — retention window and daily sweep cadence for the `universe_killmail` cache reaper (`killmail-cleanup`).
 
@@ -47,6 +48,7 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 **Wormhole / signature lifetimes**
 - `WORMHOLE_EOL_NOMINAL_MS` (4h), `WORMHOLE_EOL_CRITICAL_NOMINAL_MS` (1h) — in-game nominal EOL lifetimes; drive the displayed canvas countdown.
 - `WORMHOLE_EOL_LIFETIME_MS` (4h + 15% / 36m buffer), `WORMHOLE_EOL_CRITICAL_LIFETIME_MS` (1h + 15m) — nominal + grace-buffer reap-job purge thresholds. `WORMHOLE_DEFAULT_LIFETIME_MS` (48h) covers the non-EOL default.
+- `WORMHOLE_EXPIRED_LIFETIME_MS` (4h) — reap threshold for a manually-marked `expired` wormhole, measured from `eol_at`; safely longer than the worst-case post-"imminent" in-game lifetime.
 - `SIGNATURE_DEFAULT_TTL_MS` — default `expires_at` offset for new signatures (48 hours).
 
 **Job runtime / instrumentation**

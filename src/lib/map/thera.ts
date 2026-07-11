@@ -1,15 +1,11 @@
 import 'server-only';
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db/client';
-import { apMapConnection, apMapSystem, universeSystem } from '@/db/schema';
+import { apMapSystem, universeSystem } from '@/db/schema';
 import { fetchEveScoutConnections } from '@/lib/integrations/evescout';
-import { assignTagOnAdd, assignTagOnConnect } from '@/lib/tagging/service';
-import { getLogger } from '@/lib/log/logger';
-import { commitMapEvent, type ActionResult, type Tx } from './mutations/core';
-import { buildSystemNode } from './systemNode';
+import { type ActionResult, type Tx } from './mutations/core';
+import { ensureSystemVisible, ensureWhConnection, tagOnConnect } from './ensureTopology';
 import type { MapEventPayload } from '@/lib/realtime/protocol';
-
-const log = getLogger('server');
 
 /**
  * Thera module backend.
@@ -151,7 +147,7 @@ export async function syncTheraConnections(args: {
         const hubBase = await hubBasePosition(tx, mapId, hubSystemId, hubIndex);
         hubIndex += 1;
 
-        const hub = await ensureSystem(tx, mapId, hubSystemId, characterId, hubBase);
+        const hub = await ensureSystemVisible(tx, mapId, hubSystemId, characterId, hubBase);
         if (hub.payload) {
           payloads.push(hub.payload);
           systems += 1;
@@ -163,7 +159,7 @@ export async function syncTheraConnections(args: {
             x: Math.round(hubBase.x + TARGET_FAN_RADIUS * Math.cos(angle)),
             y: Math.round(hubBase.y + TARGET_FAN_RADIUS * Math.sin(angle)),
           };
-          const target = await ensureSystem(
+          const target = await ensureSystemVisible(
             tx,
             mapId,
             targets[i]!.targetSystemId,
@@ -175,15 +171,15 @@ export async function syncTheraConnections(args: {
             systems += 1;
           }
 
-          const conn = await ensureConnection(
+          const conn = await ensureWhConnection(
             tx,
             mapId,
             hub.mapSystemId,
             target.mapSystemId,
             characterId,
           );
-          if (conn) {
-            payloads.push(conn);
+          if (conn.payload) {
+            payloads.push(conn.payload);
             connections += 1;
           }
           edges.push({ source: hub.mapSystemId, target: target.mapSystemId });
@@ -226,163 +222,4 @@ async function hubBasePosition(
     .where(and(eq(apMapSystem.mapId, mapId), eq(apMapSystem.systemId, hubSystemId)));
   if (row?.visible) return { x: row.x, y: row.y };
   return { x: hubIndex * HUB_GROUP_SPACING, y: 0 };
-}
-
-type EnsureSystemOutcome = {
-  mapSystemId: bigint;
-  /** The `system.added` payload when newly added; undefined when already visible. */
-  payload?: MapEventPayload;
-};
-
-async function ensureSystem(
-  tx: Tx,
-  mapId: bigint,
-  systemId: number,
-  characterId: bigint | null,
-  pos: { x: number; y: number },
-): Promise<EnsureSystemOutcome> {
-  const [existing] = await tx
-    .select({ id: apMapSystem.id, visible: apMapSystem.visible })
-    .from(apMapSystem)
-    .where(and(eq(apMapSystem.mapId, mapId), eq(apMapSystem.systemId, systemId)));
-  if (existing?.visible) return { mapSystemId: existing.id };
-
-  let mapSystemId: bigint | null = null;
-  const res = await commitMapEvent({
-    mapId,
-    characterId,
-    kind: 'system.added',
-    tx,
-    mutate: async (innerTx) => {
-      const now = new Date();
-      const [row] = await innerTx
-        .insert(apMapSystem)
-        .values({ mapId, systemId, visible: true, positionX: pos.x, positionY: pos.y })
-        .onConflictDoUpdate({
-          target: [apMapSystem.mapId, apMapSystem.systemId],
-          // Preserve alias/tag/status/intel/position on a re-add (mirrors locationCommit).
-          set: { visible: true, lastVisibleAt: now, updatedAt: now },
-        })
-        .returning({ id: apMapSystem.id });
-      mapSystemId = row!.id;
-      // ABC tags here so it rides in `system.added`; 0121 clears + re-tags on connect.
-      await assignTagOnAdd(innerTx, mapId, row!.id);
-      return buildSystemNode(innerTx, row!.id);
-    },
-  });
-  if (!res.ok) throw new Error(res.error);
-  if (mapSystemId === null) throw new Error('system.added returned without a map_system id');
-  return { mapSystemId, payload: res.data };
-}
-
-async function ensureConnection(
-  tx: Tx,
-  mapId: bigint,
-  sourceMapSystemId: bigint,
-  targetMapSystemId: bigint,
-  characterId: bigint | null,
-): Promise<MapEventPayload | null> {
-  if (sourceMapSystemId === targetMapSystemId) return null;
-
-  const existing = await tx
-    .select({ id: apMapConnection.id })
-    .from(apMapConnection)
-    .where(
-      and(
-        eq(apMapConnection.mapId, mapId),
-        or(
-          and(
-            eq(apMapConnection.sourceMapSystemId, sourceMapSystemId),
-            eq(apMapConnection.targetMapSystemId, targetMapSystemId),
-          ),
-          and(
-            eq(apMapConnection.sourceMapSystemId, targetMapSystemId),
-            eq(apMapConnection.targetMapSystemId, sourceMapSystemId),
-          ),
-        ),
-      ),
-    )
-    .limit(1);
-  if (existing.length > 0) return null;
-
-  const res = await commitMapEvent({
-    mapId,
-    characterId,
-    kind: 'connection.create',
-    tx,
-    mutate: async (innerTx) => {
-      const [row] = await innerTx
-        .insert(apMapConnection)
-        .values({
-          mapId,
-          sourceMapSystemId,
-          targetMapSystemId,
-          scope: 'wh',
-          massStatus: 'fresh',
-          jumpMassClass: null,
-          eolStage: 'none',
-          preserveMass: false,
-          isRolling: false,
-          eolAt: null,
-        })
-        .returning({
-          id: apMapConnection.id,
-          source: apMapConnection.sourceMapSystemId,
-          target: apMapConnection.targetMapSystemId,
-          scope: apMapConnection.scope,
-          massStatus: apMapConnection.massStatus,
-          jumpMassClass: apMapConnection.jumpMassClass,
-          eolStage: apMapConnection.eolStage,
-          preserveMass: apMapConnection.preserveMass,
-          isRolling: apMapConnection.isRolling,
-          isStatic: apMapConnection.isStatic,
-          eolAt: apMapConnection.eolAt,
-          createdAt: apMapConnection.createdAt,
-        });
-      return {
-        id: row!.id.toString(),
-        source: row!.source.toString(),
-        target: row!.target.toString(),
-        scope: row!.scope,
-        massStatus: row!.massStatus,
-        jumpMassClass: row!.jumpMassClass,
-        eolStage: row!.eolStage,
-        preserveMass: row!.preserveMass,
-        isRolling: row!.isRolling,
-        isStatic: row!.isStatic,
-        eolAt: row!.eolAt ? row!.eolAt.toISOString() : null,
-        createdAt: row!.createdAt.toISOString(),
-      };
-    },
-  });
-  if (!res.ok) throw new Error(res.error);
-  return res.data;
-}
-
-async function tagOnConnect(
-  mapId: bigint,
-  sourceMapSystemId: bigint,
-  targetMapSystemId: bigint,
-  characterId: bigint | null,
-  payloads: MapEventPayload[],
-): Promise<void> {
-  try {
-    const tagged = await assignTagOnConnect(mapId, sourceMapSystemId, targetMapSystemId);
-    if (!tagged) return;
-    const upd = await commitMapEvent({
-      mapId,
-      characterId,
-      kind: 'system.updated',
-      mutate: async (tx) => {
-        await tx
-          .update(apMapSystem)
-          .set({ tag: tagged.tag, updatedAt: new Date() })
-          .where(and(eq(apMapSystem.id, tagged.mapSystemId), eq(apMapSystem.mapId, mapId)));
-        return { id: tagged.mapSystemId.toString(), tag: tagged.tag };
-      },
-    });
-    if (upd.ok) payloads.push(upd.data);
-  } catch (err) {
-    log.warn('thera-sync auto-tag on connect failed', { mapId: mapId.toString(), err });
-  }
 }

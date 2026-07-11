@@ -8,10 +8,19 @@ No `import 'server-only'` — imported by client components. The DB read produci
 ---
 
 ### type WormholeCatalogEntry
-One immutable catalog row, identical for every system: `typeId`, `name`, `sourceClasses` (`string[] | null`), `targetClass` (`string | null`), `jumpMassClass` (`WhJumpMass | null`).
+One immutable catalog row, identical for every system: `typeId`, `name`, `sourceClasses` (`string[] | null`), `targetClass` (`string | null`), `targetSystemId` / `targetSystemName` (`number | null` / `string | null` — fixed destination of a pinned hole like J377 → Turnur; null for normal holes), `jumpMassClass` (`WhJumpMass | null`).
 
 ### type WormholeTypeOption
 `WormholeCatalogEntry` plus the two per-system flags `isStatic` and `matchesClass`. Produced by `annotateWormholeTypes`.
+
+### type WormholeGroups
+The picker's semantic buckets for one system: `statics`, `k162`, `wandering`, `frig`, `edge` (Thera/Pochven-target), `others` (`!matchesClass`, gated behind the picker's "show all"). Each array keeps the catalog's alphabetical order.
+
+### type WormholeClassSubgroup
+`{ classLabel: string | null; options: WormholeTypeOption[] }` — a cluster of options sharing a destination class, for sub-header rendering.
+
+### EDGE_TARGET_CLASSES
+`Set` of destination class labels that form the "edge case" group: `C12` (Thera), `P` (Pochven).
 
 ---
 
@@ -29,3 +38,13 @@ Pure function. Tags each catalog entry with `isStatic` (entry's `typeId` is in t
 - `system.staticTypeIds` — the host system's static `universe_wormhole.type_id` set (`MapSystemNode.staticTypeIds`).
 
 **Returns:** The catalog annotated for that system, preserving input order.
+
+---
+
+### partitionWormholeOptions(options: WormholeTypeOption[]): WormholeGroups
+Pure single-pass partition of annotated options into `WormholeGroups`, preserving alphabetical order within each bucket. Classification precedence per option: static → K162 → non-matching (`others`) → edge target (`EDGE_TARGET_CLASSES`) → frigate (`jumpMassClass === 's'`) → wandering.
+
+---
+
+### subgroupByClass(options: WormholeTypeOption[]): WormholeClassSubgroup[]
+Clusters options by `targetClass` so the picker can order same-class holes together. Clusters are ordered wormhole-classes-first (C1–C6, then k-space and special destinations); unlisted classes and `null` sort last. Alphabetical order is preserved within each cluster.

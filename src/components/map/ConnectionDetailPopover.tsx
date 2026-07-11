@@ -6,7 +6,7 @@ import type { MapConnectionEdge } from '@/lib/map/loadMap';
 import type { WormholeJumpInfoRow } from '@/types';
 import { fetchWormholeJumpInfo } from '@/lib/reference/client';
 import { fetchConnectionMassLog } from '@/lib/map/client';
-import { connectionTimeLeftMs } from '@/lib/map/connectionState';
+import { connectionExpiredSinceMs, connectionTimeLeftMs } from '@/lib/map/connectionState';
 import { formatWormholeMass } from '@/lib/eve/wormholeFormat';
 import { Row, WormholeReferenceRows } from './WormholeDetailRows';
 
@@ -115,6 +115,19 @@ function EolCountdownRow({ connection }: { connection: MapConnectionEdge }) {
     const id = setInterval(() => setNow(Date.now()), EOL_COUNTDOWN_TICK_MS);
     return () => clearInterval(id);
   }, []);
+
+  // The manual terminal stage counts *up* from when it was flagged, not down.
+  if (connection.eolStage === 'expired') {
+    const since = connectionExpiredSinceMs(connection, now);
+    if (since === null) return null;
+    return (
+      <div className="mt-0.5 flex items-center justify-between gap-3 border-t border-border/60 pt-1">
+        <span className="text-muted-foreground">Expired</span>
+        <span className="font-medium tabular-nums text-foreground">{formatDuration(since)} ago</span>
+      </div>
+    );
+  }
+
   const ms = connectionTimeLeftMs(connection, now);
   if (ms === null) return null;
   const label = connection.eolStage === 'critical' ? 'EOL 1h' : 'EOL 4h';
@@ -131,4 +144,12 @@ function EolCountdownRow({ connection }: { connection: MapConnectionEdge }) {
       </span>
     </div>
   );
+}
+
+/** Coarse `<h>h <m>m` / `<m>m` elapsed label for the expired-since readout. */
+function formatDuration(ms: number): string {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60_000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }

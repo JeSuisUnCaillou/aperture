@@ -27,13 +27,13 @@ A compact, low-chrome vertical panel tuned to be as tight as possible (it lives 
 - `systemClassColor`, `connectionStyle`, `connectionBadges` (`./styling`)
 - `pingSystemOnServer`, `updateSystemOnServer` (`@/lib/map/client`) — Ping and Rally API calls
 - `UNDERGLOW_PRESETS`, `RALLY_UNDERGLOW` (`./underglowPresets`) — button border colours
-- `connectionTimeLeftMs` (`@/lib/map/connectionState`), `formatRelativeFromMs` (`@/lib/map/relativeTime`) — the EOL countdown
+- `connectionTimeLeftMs` / `connectionExpiredSinceMs` (`@/lib/map/connectionState`), `formatRelativeFromMs` / `formatAgoFromMs` (`@/lib/map/relativeTime`) — the EOL countdown and expired-since label
 - `cn` (`@/lib/utils`)
 - `ChevronDown`, `ChevronUp` from `lucide-react` — pilot table sort indicators
 - Types from `@/types`: `MapViewData`, `MapSystemNode`, `MapConnectionEdge`, `MapPresenceEntry`
 
 ### Local State
-- `useEolCountdown(edge)` — per-connection-row hook ticking a `now` clock every 30s while the edge is EOL; returns a formatted "time left" string or null.
+- `useEolCountdown(edge)` — per-connection-row hook ticking a `now` clock every 30s while the edge is EOL; returns a formatted "time left" string for `eol`/`critical`, an `"expired 3h ago"` elapsed string for the manual `expired` stage, or null.
 - `pinging: boolean` (Header) — true while a ping POST is in flight; disables the Ping button.
 - `togglingRally: boolean` (Header) — true while a rally PATCH is in flight; disables the Rally button.
 - `sort: PilotSort` (Pilots) — `{ key: PilotSortKey; dir: 'asc' | 'desc' }` tracking the active pilot table sort column and direction.

@@ -143,7 +143,8 @@ export type EdgeStyle = {
 /**
  * Stroke styling for a connection. Scope picks the base colour; wormholes are
  * recoloured by mass status. EOL connections dash — the `critical` (1h) stage
- * dashes more tightly than the `eol` (4h) stage to read as more urgent; frigate
+ * dashes more tightly than the `eol` (4h) stage to read as more urgent, and the
+ * manual `expired` stage dashes sparsest of all to read as barely-there; frigate
  * holes thin out.
  */
 export function connectionStyle(edge: MapConnectionEdge): EdgeStyle {
@@ -152,7 +153,13 @@ export function connectionStyle(edge: MapConnectionEdge): EdgeStyle {
     stroke,
     strokeWidth: edge.jumpMassClass === 's' ? 1.5 : 3,
     strokeDasharray:
-      edge.eolStage === 'critical' ? '2 3' : edge.eolStage === 'eol' ? '6 4' : undefined,
+      edge.eolStage === 'expired'
+        ? '1 4'
+        : edge.eolStage === 'critical'
+          ? '2 3'
+          : edge.eolStage === 'eol'
+            ? '6 4'
+            : undefined,
   };
 }
 
@@ -160,10 +167,12 @@ export type ConnectionBadge = {
   key: string;
   label: string;
   /**
-   * Small/frigate holes are easy to miss and people bring oversized ships, so
-   * the `s` size badge renders as a filled warning pill rather than plain text.
+   * Renders the badge as a filled pill rather than plain text, for "check before
+   * you jump" hazards: `warn` (amber) for the `s` (frigate) size badge — easy to
+   * miss, people bring oversized ships — and `danger` (red) for the `EXPIRED`
+   * marker (do not jump).
    */
-  warn?: boolean;
+  tone?: 'warn' | 'danger';
 };
 
 /**
@@ -178,10 +187,11 @@ export function connectionBadges(edge: MapConnectionEdge): ConnectionBadge[] {
     badges.push({
       key: 'size',
       label: edge.jumpMassClass.toUpperCase(),
-      warn: edge.jumpMassClass === 's',
+      tone: edge.jumpMassClass === 's' ? 'warn' : undefined,
     });
   }
-  if (edge.eolStage === 'critical') badges.push({ key: 'eol', label: 'EOL 1h' });
+  if (edge.eolStage === 'expired') badges.push({ key: 'eol', label: 'EXPIRED', tone: 'danger' });
+  else if (edge.eolStage === 'critical') badges.push({ key: 'eol', label: 'EOL 1h' });
   else if (edge.eolStage === 'eol') badges.push({ key: 'eol', label: 'EOL' });
   return badges;
 }

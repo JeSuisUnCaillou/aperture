@@ -522,11 +522,13 @@ async function ingestTypeOverrides(wormholeCodeToTypeId: Map<string, number>) {
 }
 
 /**
- * Vendored `code;sourceClasses;targetClass` CSV (anoik.is /wormholes) → the
+ * Vendored `code;sourceClasses;targetClass;targetSystem` CSV → the
  * `universe_wormhole` routing catalog. Class labels are absent from the SDE;
  * mass/lifetime stay dogma-sourced. `sourceClasses` is a `|`-joined set (a hole
  * can spawn in several classes, e.g. `S199` = `L|0.0`); an empty cell becomes
  * null (source unspecified — K162 and the Drifter/shattered-access holes).
+ * `targetSystem` names the fixed destination for holes that always exit to one
+ * system (J377 → Turnur); resolved to an id against `universe_system`.
  */
 async function ingestWormholeCatalog(wormholeCodeToTypeId: Map<string, number>) {
   const path = join(DATA_DIR, 'wormhole-classes.csv');
@@ -541,22 +543,45 @@ async function ingestWormholeCatalog(wormholeCodeToTypeId: Map<string, number>) 
     skip_empty_lines: true,
     trim: true,
   }) as Record<string, string>[];
+
+  // Only fixed-destination holes carry a targetSystem name; resolve it against
+  // universe_system so the FK is guaranteed valid.
+  const systemNameToId = new Map<string, number>();
+  if (records.some((r) => r.targetSystem)) {
+    const systemRows = await db
+      .select({ id: universeSystem.id, name: universeSystem.name })
+      .from(universeSystem);
+    for (const s of systemRows) systemNameToId.set(s.name, s.id);
+  }
+
   const rows: {
     typeId: number;
     name: string;
     sourceClasses: string[] | null;
     targetClass: string | null;
+    targetSystemId: number | null;
   }[] = [];
   for (const r of records) {
     const code = r.code?.toUpperCase();
     if (!code) continue;
     const typeId = wormholeCodeToTypeId.get(code);
     if (typeId == null) continue;
+    let targetSystemId: number | null = null;
+    if (r.targetSystem) {
+      const id = systemNameToId.get(r.targetSystem);
+      if (id == null) {
+        throw new Error(
+          `wormhole-classes.csv: ${code} targetSystem "${r.targetSystem}" not found in universe_system`,
+        );
+      }
+      targetSystemId = id;
+    }
     rows.push({
       typeId,
       name: code,
       sourceClasses: r.sourceClasses ? r.sourceClasses.split('|') : null,
       targetClass: r.targetClass ? r.targetClass : null,
+      targetSystemId,
     });
   }
   // Reseed authoritatively (table is fully derived from this CSV) so a re-run after
@@ -568,7 +593,12 @@ async function ingestWormholeCatalog(wormholeCodeToTypeId: Map<string, number>) 
       .values(c)
       .onConflictDoUpdate({
         target: universeWormhole.typeId,
-        set: excluded(universeWormhole, ['name', 'sourceClasses', 'targetClass']),
+        set: excluded(universeWormhole, [
+          'name',
+          'sourceClasses',
+          'targetClass',
+          'targetSystemId',
+        ]),
       });
   }
   return rows.length;

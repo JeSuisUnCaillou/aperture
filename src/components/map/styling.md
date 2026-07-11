@@ -30,10 +30,10 @@ Returns the amber/gold accent (`#fbbf24`) used to mark the map's designated Home
 Border colour for a map note (`MapNoteNode`), by `map_note_severity`: `neutral`→grey `#6b7280` (the file's default, so an unflagged note reads as "no severity"), `green`→`#22c55e`, `yellow`→`#eab308`, `red`→`#ef4444`.
 
 ### connectionStyle(edge: MapConnectionEdge): EdgeStyle
-Returns `{ stroke, strokeWidth, strokeDasharray? }`. Scope sets the base colour; wormholes are recoloured by `massStatus` (fresh/reduced/critical). `eolStage` dashes the line — `critical` (1h) dashes tighter (`2 3`) than `eol` (4h, `6 4`) to read as more urgent; `jumpMassClass === 's'` thins the stroke (frigate/small holes).
+Returns `{ stroke, strokeWidth, strokeDasharray? }`. Scope sets the base colour; wormholes are recoloured by `massStatus` (fresh/reduced/critical). `eolStage` dashes the line — `expired` sparsest (`1 4`, barely-there), `critical` (1h) tighter (`2 3`) than `eol` (4h, `6 4`) — to read as progressively more urgent; `jumpMassClass === 's'` thins the stroke (frigate/small holes).
 
 ### connectionBadges(edge: MapConnectionEdge): ConnectionBadge[]
-Structured text badges for a connection: `STATIC` (user-designated static), jump-mass class (`S`/`M`/`L`/`XL`), then `EOL` (eol stage) or `EOL 1h` (critical stage). Each badge is `{ key, label, warn? }`. The small (`s`) size badge carries `warn: true` so `ConnectionEdge` renders it as a filled amber warning pill — small holes are easy to miss and people bring oversized ships. Rolling and preserve-mass are **not** returned here; `ConnectionEdge` renders them as standalone icons.
+Structured text badges for a connection: `STATIC` (user-designated static), jump-mass class (`S`/`M`/`L`/`XL`), then `EOL` (eol stage), `EOL 1h` (critical stage), or `EXPIRED` (manual expired stage). Each badge is `{ key, label, tone? }`. The small (`s`) size badge carries `tone: 'warn'` (filled amber pill — small holes are easy to miss) and the `EXPIRED` badge `tone: 'danger'` (filled red pill — do-not-jump hazard); `ConnectionEdge`/`SystemOverlay` colour the pill by tone. Rolling and preserve-mass are **not** returned here; `ConnectionEdge` renders them as standalone icons.
 
 ### Notes
 - Kept out of Tailwind tokens because they're consumed inside SVG/inline styles.

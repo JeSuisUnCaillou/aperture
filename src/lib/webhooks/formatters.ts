@@ -209,6 +209,7 @@ function describeConnectionChanges(
   }
   if (event.eolStage === 'eol') changes.push('EOL → ~4h');
   else if (event.eolStage === 'critical') changes.push('EOL → critical (~1h)');
+  else if (event.eolStage === 'expired') changes.push('EOL → expired');
   else if (event.eolStage === 'none') changes.push('EOL cleared');
   if (event.isRolling === true) changes.push('rolling started');
   else if (event.isRolling === false) changes.push('rolling stopped');

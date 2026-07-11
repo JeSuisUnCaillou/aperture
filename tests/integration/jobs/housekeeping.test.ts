@@ -245,6 +245,30 @@ describe.skipIf(!run)('Stage 11.2 housekeeping jobs (real Postgres)', () => {
         eolAt: sql`now() - interval '30 minutes'`,
       })
       .returning({ id: apMapConnection.id });
+    // Active map, manual `expired` (4h) stage: stale (5h, dies) + fresh (1h,
+    // survives) — proving the expired window is measured from eol_at too.
+    const [staleExpired] = await db
+      .insert(apMapConnection)
+      .values({
+        mapId: activeMapId,
+        sourceMapSystemId: mapSystemA,
+        targetMapSystemId: mapSystemB,
+        scope: 'wh',
+        eolStage: 'expired',
+        eolAt: sql`now() - interval '5 hours'`,
+      })
+      .returning({ id: apMapConnection.id });
+    const [freshExpired] = await db
+      .insert(apMapConnection)
+      .values({
+        mapId: activeMapId,
+        sourceMapSystemId: mapSystemA,
+        targetMapSystemId: mapSystemB,
+        scope: 'wh',
+        eolStage: 'expired',
+        eolAt: sql`now() - interval '1 hour'`,
+      })
+      .returning({ id: apMapConnection.id });
     // Opt-out map: stale EOL that should survive because the map opted out.
     const [optOutStale] = await db
       .insert(apMapConnection)
@@ -265,6 +289,8 @@ describe.skipIf(!run)('Stage 11.2 housekeeping jobs (real Postgres)', () => {
       freshEol!.id,
       staleCritical!.id,
       freshCritical!.id,
+      staleExpired!.id,
+      freshExpired!.id,
       optOutStale!.id,
     ];
     const survivors = await db
@@ -272,23 +298,30 @@ describe.skipIf(!run)('Stage 11.2 housekeeping jobs (real Postgres)', () => {
       .from(apMapConnection)
       .where(inArray(apMapConnection.id, ids));
     expect(new Set(survivors.map((r) => r.id))).toEqual(
-      new Set([freshEol!.id, freshCritical!.id, optOutStale!.id]),
+      new Set([freshEol!.id, freshCritical!.id, freshExpired!.id, optOutStale!.id]),
     );
 
     const events = await db
       .select({ kind: apMapEvent.kind })
       .from(apMapEvent)
       .where(and(eq(apMapEvent.mapId, activeMapId), eq(apMapEvent.kind, 'connection.delete')));
-    expect(events.length).toBeGreaterThanOrEqual(2);
+    expect(events.length).toBeGreaterThanOrEqual(3);
 
     const runRow = await lastJobRun('eol-expiry');
     expect(runRow!.success).toBe(true);
-    expect(runRow!.notes).toMatchObject({ deleted: 2, failed: 0 });
+    expect(runRow!.notes).toMatchObject({ deleted: 3, failed: 0 });
 
     // Clean up the survivors so the next test starts from a known state.
     await db
       .delete(apMapConnection)
-      .where(inArray(apMapConnection.id, [freshEol!.id, freshCritical!.id, optOutStale!.id]));
+      .where(
+        inArray(apMapConnection.id, [
+          freshEol!.id,
+          freshCritical!.id,
+          freshExpired!.id,
+          optOutStale!.id,
+        ]),
+      );
   });
 
   // ─── expired-connections ──────────────────────────────────────────────────

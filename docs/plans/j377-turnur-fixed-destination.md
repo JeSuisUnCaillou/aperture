@@ -26,15 +26,16 @@
 **Touches:**
 - `src/db/migrations/0048_wormhole_target_system.sql` + `.rollback.sql` + `meta/_journal.json` (hand-written; latest is 0047).
 - `src/db/schema/universe/statics.ts` + `statics.md`, `src/db/schema.md`.
-- `scripts/data/wormhole-classes.csv` (extend to `code;sourceClasses;targetClass;targetSystem`, only J377 populated) **or** a small separate vendored override file — decide in plan mode.
+- `scripts/data/wormhole-classes.csv` — extend the existing catalog to `code;sourceClasses;targetClass;targetSystem`, only J377 populated (`J377;;L;Turnur`). **Decision: extend this file, not a sidecar.** anoik.is is frozen and this CSV is already hand-maintained (originally seeded from anoik, since hand-edited as CCP adds types anoik never tracked), so the "keep the anoik projection pure" argument for a separate file is void, and a fixed destination is an intrinsic property of the type's own row.
 - `src/lib/sde/ingest.ts` + `ingest.md` (`runCsvIngest` / the `wormhole-classes.csv` reader resolves the destination system id; FK-safe against `universe_system`).
 
 **Details:**
 - Add nullable `target_system_id` `integer` FK → `universe_system.id` `ON DELETE RESTRICT` on `universe_wormhole`. NULL for every normal hole (destination genuinely unknown until scanned); set only for fixed-destination holes.
 - The *column* is a schema change (migration). The *value* is `universe_*` data, so it rides the vendored CSV consumed by ingest, per the "data fixes via ingest, not migrations" rule — the migration ships an empty column, ingest fills J377.
 - Reseed remains authoritative (full delete + insert), so the new column must be written on every reseed, not patched in.
+- **Provenance reality (why extend, not regenerate):** the vendored CSVs are no longer a regenerable anoik.is projection. anoik.is is frozen, so the files are hand-maintained (seeded from anoik, then hand-edited as CCP ships new types). Set the `targetSystem` value by hand-editing the J377 row. The stale "Re-pull / regenerate from `static.json`" instruction in `ingest.md` and the "(anoik.is /wormholes)" framing in `statics.md` have been corrected to reflect this — a regenerate would drop J377 and every other hand-added type.
 
-**Done when:** migration applies cleanly (and rolls back); `pnpm sde:csv` populates J377's `target_system_id` with Turnur's id and leaves all other rows NULL; a spot query confirms it; lint + typecheck + build green.
+**Done when:** migration applies cleanly (and rolls back); `ingest.ts` parses the 4th `targetSystem` cell and resolves it to Turnur's id FK-safely against `universe_system`; `pnpm sde:csv` populates J377's `target_system_id` with Turnur's id and leaves all other rows NULL; a spot query confirms it; lint + typecheck + build green.
 
 ---
 
@@ -81,3 +82,15 @@
 - Start a **fresh session per stage** (per CLAUDE.md planning convention). Open this file, read the stage, enter the mode it names (`Shift+Tab` toggles Plan ⇄ Accept-edits), and execute just that stage.
 - Stages 1 and 2 are independently shippable and harmless on their own (data + display only). Stage 3 is where behavior changes — keep it gated behind the explicit affordance so a half-done Stage 3 never auto-mutates maps.
 - Don't widen scope to "any fixed-destination hole framework" beyond what J377 needs — `target_system_id` already *is* the general mechanism; J377 is simply its first row. Future Turnur-style holes slot in as data with no further schema work.
+
+## Follow-up — drifter holes leak through the leads-to back-filter (issue #208) — RESOLVED
+
+**Resolved** alongside J492 (#212): the five Drifter holes now carry an accurate destination in `wormhole-classes.csv` (`target_class` = their Drifter class C14–C18, `target_system_id` = their complex), so the #208 back-filter excludes them for mismatched classes with no filter-code change. The five `C12` holes were pinned to Thera in the same pass. Original analysis retained below.
+
+
+
+`WormholeTypeSelect` back-filters the picker to types consistent with the bound leads-to connection's class (issue #208, shipped). The filter keeps any hole whose `targetClass` is null, because null means "resolves from the far side" (K162). The drifter/shattered-access holes — **B735, C414, R259, S877, V928** — carry a null `targetClass` in `wormhole-classes.csv` (`B735;H|L|0.0;` = source `H|L|0.0`, target unset), so the filter can't exclude them: they surface in the default list for *any* destination class (e.g. a regular C1), which is confusing.
+
+The real fix is data, not filter logic: these holes lead to Drifter space, not to an arbitrary class, so they need an accurate destination the same way J377/J492 do. Once a drifter hole carries a real destination (a specific system via `target_system_id`, **or** a Drifter/edge destination class if that's the better model for the five-region drifter case), the existing #208 back-filter excludes them for mismatched classes with **no filter-code change** — it's purely the catalog getting more precise.
+
+When picking up this plan (or #212 / #173 / #213), fold the drifter holes in as part of the destination-data pass so #208 stops surfacing them for arbitrary leads-to classes. Until then, the picker's `Show all types` fallback still reaches them, so nothing is unreachable — the leak is noise, not a blocker.

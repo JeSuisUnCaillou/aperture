@@ -16,7 +16,7 @@ Returns the **full**, system-independent wormhole catalog ordered by code — ev
 
 - `jumpMassClass` — from the `wormholeMaxJumpMass` dogma value (resolved by name from `universe_dogma_attribute`, read through `universe_type_attribute_effective`), bucketed by `jumpMassBand`. If the attribute name can't be resolved, every `jumpMassClass` is `null` (no join performed).
 
-**Returns:** `WormholeCatalogEntry[]` — `{ typeId, name, sourceClasses, targetClass, jumpMassClass }`.
+**Returns:** `WormholeCatalogEntry[]` — `{ typeId, name, sourceClasses, targetClass, targetSystemId, targetSystemName, jumpMassClass }`. `targetSystemId` / `targetSystemName` come from a left join to `universe_system` (fixed destination of a pinned hole; null for normal holes).
 
 ---
 

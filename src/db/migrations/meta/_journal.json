@@ -365,6 +365,20 @@
       "when": 1780118400000,
       "tag": "0052_activity_rollup_daily",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1780204800000,
+      "tag": "0053_eol_stage_expired",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1780208400000,
+      "tag": "0054_wormhole_target_system",
+      "breakpoints": true
     }
   ]
 }

@@ -194,14 +194,20 @@ function ConnectionsPanel({
               <Td className="uppercase">{c.jumpMassClass ?? '—'}</Td>
               <Td
                 className={
-                  c.eolStage === 'critical'
+                  c.eolStage === 'expired' || c.eolStage === 'critical'
                     ? 'font-medium text-destructive'
                     : c.eolStage === 'eol'
                       ? 'text-destructive'
                       : 'text-muted-foreground'
                 }
               >
-                {c.eolStage === 'critical' ? 'EOL 1h' : c.eolStage === 'eol' ? 'EOL' : '—'}
+                {c.eolStage === 'expired'
+                  ? 'Expired'
+                  : c.eolStage === 'critical'
+                    ? 'EOL 1h'
+                    : c.eolStage === 'eol'
+                      ? 'EOL'
+                      : '—'}
               </Td>
             </tr>
           ))}

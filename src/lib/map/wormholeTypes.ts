@@ -59,8 +59,11 @@ export async function wormholeCatalog(): Promise<WormholeCatalogEntry[]> {
         name: universeWormhole.name,
         sourceClasses: universeWormhole.sourceClasses,
         targetClass: universeWormhole.targetClass,
+        targetSystemId: universeWormhole.targetSystemId,
+        targetSystemName: universeSystem.name,
       })
       .from(universeWormhole)
+      .leftJoin(universeSystem, eq(universeSystem.id, universeWormhole.targetSystemId))
       .orderBy(universeWormhole.name);
     return rows.map((r) => ({ ...r, jumpMassClass: null }));
   }
@@ -71,9 +74,12 @@ export async function wormholeCatalog(): Promise<WormholeCatalogEntry[]> {
       name: universeWormhole.name,
       sourceClasses: universeWormhole.sourceClasses,
       targetClass: universeWormhole.targetClass,
+      targetSystemId: universeWormhole.targetSystemId,
+      targetSystemName: universeSystem.name,
       jumpMass: universeTypeAttributeEffective.value,
     })
     .from(universeWormhole)
+    .leftJoin(universeSystem, eq(universeSystem.id, universeWormhole.targetSystemId))
     .leftJoin(
       universeTypeAttributeEffective,
       and(

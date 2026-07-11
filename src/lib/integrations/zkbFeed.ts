@@ -116,6 +116,18 @@ export function correlateKill(kill: ZkbKill, index: SystemIndex): SystemNotifica
   return out;
 }
 
+/**
+ * Age of a decoded kill in ms from its ESI `killmail_time`, or `null` when that
+ * time is missing or unparseable. The caller treats a null age as stale: a kill
+ * we can't date is one we won't flash.
+ */
+function killAgeMs(kill: ZkbKill): number | null {
+  if (!kill.killmail_time) return null;
+  const t = Date.parse(kill.killmail_time);
+  if (Number.isNaN(t)) return null;
+  return Date.now() - t;
+}
+
 async function notify(load: SystemNotificationLoad): Promise<void> {
   const channel = `${apertureConfig.MAP_EVENT_NOTIFY_CHANNEL_PREFIX}${load.mapId}`;
   const envelope = JSON.stringify({ task: 'systemNotification', load });
@@ -207,9 +219,16 @@ export async function pollOnce(): Promise<PollResult> {
     await refreshIndexIfStale(signal);
 
     if (state.cursor === null) {
-      const { body } = await fetchJson(`${BASE}/sequence.json`, signal);
+      const { status, body } = await fetchJson(`${BASE}/sequence.json`, signal);
       const parsed = sequenceSchema.safeParse(body);
-      state.cursor = parsed.success ? parsed.data.sequence : 0;
+      if (!parsed.success) {
+        // Leave cursor null → re-seed next tick. Never fall back to 0: seq 1 has
+        // long since aged out of the ephemeral feed, so a 0 cursor 404s on the
+        // first walk step and wedges the feed dead (never re-seeds).
+        jobLog.warn('zkb.seed_failed', { status });
+        return { processed: 0, notified: 0, cursor: null };
+      }
+      state.cursor = parsed.data.sequence;
       return { processed: 0, notified: 0, cursor: state.cursor };
     }
 
@@ -229,6 +248,14 @@ export async function pollOnce(): Promise<PollResult> {
       processed++;
       const kill = decodeKill(body);
       if (!kill) continue;
+      const ageMs = killAgeMs(kill);
+      if (ageMs === null || ageMs > apertureConfig.ZKB_FEED_MAX_KILL_AGE_MS) {
+        // zKB appends reprocessed / late-submitted kills to the live sequence, so
+        // a healthy forward walk still hands us stale kills; drop them before
+        // they flash a phantom underglow (a missing/unparseable time is stale).
+        jobLog.info('zkb.stale_skipped', { killmailId: kill.killmail_id, ageMs });
+        continue;
+      }
       for (const load of correlateKill(kill, state.index)) {
         await notify(load);
         notified++;

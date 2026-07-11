@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { connectionTimeLeftMs } from '@/lib/map/connectionState';
-import { formatRelativeFromMs } from '@/lib/map/relativeTime';
+import { connectionExpiredSinceMs, connectionTimeLeftMs } from '@/lib/map/connectionState';
+import { formatAgoFromMs, formatRelativeFromMs } from '@/lib/map/relativeTime';
 import {
   Select,
   SelectContent,
@@ -543,6 +543,17 @@ function ConnectionExpiryHint({ connection }: { connection: MapConnectionEdge })
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
+  // The manual terminal stage counts up from when it was flagged, not down.
+  if (connection.eolStage === 'expired') {
+    const since = connectionExpiredSinceMs(connection, now);
+    if (since === null) return null;
+    return (
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+        <span>Expired</span>
+        <span className="font-medium tabular-nums text-foreground">{formatAgoFromMs(since)}</span>
+      </div>
+    );
+  }
   const ms = connectionTimeLeftMs(connection, now);
   if (ms === null) return null;
   const label = connection.eolStage !== 'none' ? 'EOL expires in' : 'Expires in';

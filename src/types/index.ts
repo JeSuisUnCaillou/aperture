@@ -319,6 +319,9 @@ export type { MapExportFile, ImportSummary, ImportResult } from '@/lib/map/trans
 // Thera module view-model + sync types (src/lib/map/thera.ts).
 export type { TheraHub, TheraConnection, TheraSyncInput, TheraSyncResult } from '@/lib/map/thera';
 
+// Fixed-destination resolve result (src/lib/map/fixedDestination.ts).
+export type { ResolveDestinationResult } from '@/lib/map/fixedDestination';
+
 // Auto-tagging strategy contract + view-model (src/lib/tagging/types.ts).
 export type {
   ActiveScheme,
@@ -410,7 +413,12 @@ export type {
 } from '@/lib/map/mutations/restoreConnection';
 
 // Wormhole-catalog lookup result types (src/lib/map/wormholeTypes.ts).
-export type { WormholeCatalogEntry, WormholeTypeOption } from '@/lib/map/wormholeCatalog';
+export type {
+  WormholeCatalogEntry,
+  WormholeTypeOption,
+  WormholeGroups,
+  WormholeClassSubgroup,
+} from '@/lib/map/wormholeCatalog';
 export type { StaticMatch } from '@/lib/map/wormholeTypes';
 
 // Solar-system name search result (src/lib/map/systemSearch.ts).

@@ -105,7 +105,7 @@
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.85 0 0);
     --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
+    --muted-foreground: oklch(0.66 0 0);
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.85 0 0);
     --destructive: oklch(68.025% 0.2081 23.639);
@@ -229,6 +229,38 @@
   }
   .ap-sig-flash {
     animation: ap-sig-flash 3s ease-in-out forwards;
+  }
+
+  /* Paste feedback: a sonar-ping highlight on rows a scanner paste created or
+     updated — instant tint, then a fade-out. Created reads green, updated blue,
+     so the two are distinguishable at a glance. The flash is parity-aware: even
+     rows tint a shade nudged toward --foreground and settle onto the zebra
+     resting colour, so the row striping stays legible under the wash and there's
+     no jump when the flash class is removed. The 3%-opacity zebra stripe alone
+     can't survive under a solid tint, hence the explicit even/odd split. */
+  .ap-sig-flash-created {
+    --sig-ping-color: rgb(16 185 129 / 0.32);
+  }
+  .ap-sig-flash-updated {
+    --sig-ping-color: rgba(56, 171, 248, 0.32);
+  }
+  .ap-sig-flash-created,
+  .ap-sig-flash-updated {
+    --sig-ping-even: color-mix(in oklab, var(--foreground) 10%, var(--sig-ping-color));
+    --sig-ping-rest-even: color-mix(in oklab, var(--foreground) 3%, transparent);
+    animation: ap-sig-ping 2.5s ease-out forwards;
+  }
+  tr:nth-child(even).ap-sig-flash-created,
+  tr:nth-child(even).ap-sig-flash-updated {
+    animation-name: ap-sig-ping-even;
+  }
+  @keyframes ap-sig-ping {
+    0%   { background-color: var(--sig-ping-color); }
+    100% { background-color: transparent; }
+  }
+  @keyframes ap-sig-ping-even {
+    0%   { background-color: var(--sig-ping-even); }
+    100% { background-color: var(--sig-ping-rest-even); }
   }
 
   /* Blinking separator for the live EOL countdown colon — a 1s on/off pulse
