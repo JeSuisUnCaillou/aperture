@@ -19,6 +19,8 @@ function entry(
     name,
     sourceClasses: ['C3'],
     targetClass: null,
+    targetSystemId: null,
+    targetSystemName: null,
     jumpMassClass: null,
     ...overrides,
   };

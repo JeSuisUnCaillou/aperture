@@ -93,7 +93,9 @@ function MassTable({ rows }: { rows: WormholeJumpInfoRow[] }) {
             {rows.map((r) => (
               <tr key={r.code} className="border-t border-foreground/10">
                 <td className="px-2 py-1 font-mono">{r.code}</td>
-                <td className="px-2 py-1">{r.targetClass ?? '—'}</td>
+                <td className="px-2 py-1">
+                  <LeadsTo systemName={r.targetSystemName} targetClass={r.targetClass} />
+                </td>
                 <td className="px-2 py-1 text-right font-mono tabular-nums">{formatWormholeMass(r.totalMass)}</td>
                 <td className="px-2 py-1 text-right font-mono tabular-nums">{formatWormholeMass(r.jumpMass)}</td>
                 <td className="px-2 py-1 text-right font-mono tabular-nums">{formatWormholeLifetime(r.lifetimeMinutes)}</td>
@@ -107,10 +109,36 @@ function MassTable({ rows }: { rows: WormholeJumpInfoRow[] }) {
   );
 }
 
+/**
+ * A hole's destination: the pinned system name (J377 → Turnur) when the type has
+ * a fixed destination, otherwise its leads-to class. Both when present, class
+ * muted; em-dash when neither is known.
+ */
+function LeadsTo({
+  systemName,
+  targetClass,
+}: {
+  systemName: string | null;
+  targetClass: string | null;
+}) {
+  if (systemName) {
+    return (
+      <>
+        {systemName}
+        {targetClass ? <span className="text-muted-foreground"> ({targetClass})</span> : null}
+      </>
+    );
+  }
+  return <>{targetClass ?? '—'}</>;
+}
+
 function StaticsOverview({
   statics,
 }: {
-  statics: { sourceClass: string; entries: { code: string; targetClass: string | null }[] }[];
+  statics: {
+    sourceClass: string;
+    entries: { code: string; targetClass: string | null; targetSystemName: string | null }[];
+  }[];
 }) {
   return (
     <section className="flex flex-col gap-1.5">
@@ -125,7 +153,9 @@ function StaticsOverview({
               {group.entries.map((e) => (
                 <li key={e.code} className="flex items-center justify-between gap-2 py-0.5">
                   <span className="font-mono">{e.code}</span>
-                  <span className="text-muted-foreground">{e.targetClass ?? '—'}</span>
+                  <span className="text-muted-foreground">
+                    <LeadsTo systemName={e.targetSystemName} targetClass={e.targetClass} />
+                  </span>
                 </li>
               ))}
             </ul>
@@ -149,16 +179,20 @@ function fmtSig(value: number | null): string {
  * (null — K162 + Drifter/shattered-access holes) is bucketed last under "Any".
  * Within a class, codes stay in the catalog's code order.
  */
-function groupBySource(
-  rows: WormholeJumpInfoRow[],
-): { sourceClass: string; entries: { code: string; targetClass: string | null }[] }[] {
+function groupBySource(rows: WormholeJumpInfoRow[]): {
+  sourceClass: string;
+  entries: { code: string; targetClass: string | null; targetSystemName: string | null }[];
+}[] {
   const ANY = 'Any';
-  const buckets = new Map<string, { code: string; targetClass: string | null }[]>();
+  const buckets = new Map<
+    string,
+    { code: string; targetClass: string | null; targetSystemName: string | null }[]
+  >();
   for (const r of rows) {
     const keys = r.sourceClasses && r.sourceClasses.length > 0 ? r.sourceClasses : [ANY];
     for (const key of keys) {
       const list = buckets.get(key) ?? [];
-      list.push({ code: r.code, targetClass: r.targetClass });
+      list.push({ code: r.code, targetClass: r.targetClass, targetSystemName: r.targetSystemName });
       buckets.set(key, list);
     }
   }

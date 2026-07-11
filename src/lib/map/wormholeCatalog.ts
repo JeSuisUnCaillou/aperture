@@ -21,6 +21,10 @@ export type WormholeCatalogEntry = {
   sourceClasses: string[] | null;
   /** Class it leads into; null = resolved from the far side. */
   targetClass: string | null;
+  /** Fixed destination system id (J377 → Turnur); null for normal holes. */
+  targetSystemId: number | null;
+  /** Fixed destination system name; null for normal holes. */
+  targetSystemName: string | null;
   /** Inferred per-jump size band from `wormholeMaxJumpMass`; null = unknown (e.g. K162). */
   jumpMassClass: WhJumpMass | null;
 };

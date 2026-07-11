@@ -52,6 +52,8 @@ function makeEntry(
     name,
     sourceClasses: ['C5'], // does not include 'C3' → not class-matched unless overridden
     targetClass: null,
+    targetSystemId: null,
+    targetSystemName: null,
     jumpMassClass: null,
     ...overrides,
   };

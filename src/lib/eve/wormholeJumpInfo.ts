@@ -1,8 +1,9 @@
 import 'server-only';
-import { and, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db/client';
 import {
   universeDogmaAttribute,
+  universeSystem,
   universeTypeAttributeEffective,
   universeWormhole,
 } from '@/db/schema';
@@ -34,6 +35,10 @@ export type WormholeJumpInfoRow = {
   sourceClasses: string[] | null;
   /** Class it leads into; null = resolved from the far side. */
   targetClass: string | null;
+  /** Fixed destination system id (J377 → Turnur); null for normal holes. */
+  targetSystemId: number | null;
+  /** Fixed destination system name; null for normal holes. */
+  targetSystemName: string | null;
   /** Total stable mass (kg). */
   totalMass: number | null;
   /** Max mass per single jump (kg). */
@@ -67,8 +72,11 @@ export async function wormholeJumpInfo(): Promise<WormholeJumpInfoRow[]> {
       code: universeWormhole.name,
       sourceClasses: universeWormhole.sourceClasses,
       targetClass: universeWormhole.targetClass,
+      targetSystemId: universeWormhole.targetSystemId,
+      targetSystemName: universeSystem.name,
     })
     .from(universeWormhole)
+    .leftJoin(universeSystem, eq(universeSystem.id, universeWormhole.targetSystemId))
     .orderBy(universeWormhole.name);
 
   const attrIds = [totalMassId, jumpMassId, lifetimeId, sigStrengthId].filter(
@@ -112,6 +120,8 @@ export async function wormholeJumpInfo(): Promise<WormholeJumpInfoRow[]> {
     code: r.code,
     sourceClasses: r.sourceClasses,
     targetClass: r.targetClass,
+    targetSystemId: r.targetSystemId,
+    targetSystemName: r.targetSystemName,
     totalMass: valueOf(r.typeId, totalMassId),
     jumpMass: valueOf(r.typeId, jumpMassId),
     lifetimeMinutes: valueOf(r.typeId, lifetimeId),

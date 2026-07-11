@@ -8,7 +8,7 @@ No `import 'server-only'` — imported by client components. The DB read produci
 ---
 
 ### type WormholeCatalogEntry
-One immutable catalog row, identical for every system: `typeId`, `name`, `sourceClasses` (`string[] | null`), `targetClass` (`string | null`), `jumpMassClass` (`WhJumpMass | null`).
+One immutable catalog row, identical for every system: `typeId`, `name`, `sourceClasses` (`string[] | null`), `targetClass` (`string | null`), `targetSystemId` / `targetSystemName` (`number | null` / `string | null` — fixed destination of a pinned hole like J377 → Turnur; null for normal holes), `jumpMassClass` (`WhJumpMass | null`).
 
 ### type WormholeTypeOption
 `WormholeCatalogEntry` plus the two per-system flags `isStatic` and `matchesClass`. Produced by `annotateWormholeTypes`.
