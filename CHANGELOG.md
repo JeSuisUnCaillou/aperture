@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.0.0-rc.15
+
+This release lets directors delegate individual director-gated map features to specific EVE corporation titles, adds a derived combat/exploration classifier for signature sites, and opens a machine-to-machine activity-stats endpoint for external tooling.
+
+### New features
+
+- **Per-title map feature delegation (R4)** - a director can hand a single director-gated map feature (audit, webhooks, settings, delete, import, export) to a specific EVE corporation title, from a new manager-only Roles & Permissions tab. Delegation is corp-scoped in v1 (private and alliance maps show it as unavailable); grants and revokes land as audit-visible `access.granted` / `access.revoked` events. *(MonoliYoda)*
+- **Signature site-safety classifier** - signature rows now carry a derived combat-vs-exploration read (red swords / green shield-check), seeded from the whtype.info safe-explo dataset, with a manual right-click override back to Combat, Exploration, or Auto. The signature search panel gains a matching Any/Combat/Exploration filter. Wormhole signatures are exempt - they never show the glyph or the override menu. *(MonoliYoda)*
+- **Activity-stats integration endpoint** - `POST /api/integrations/activity-stats` gives external tools token-authenticated, read-only access to per-character map activity, scoped to the token's corporation. Off by default behind `INTEGRATIONS_ENABLED`; tokens are minted, listed, and revoked with `pnpm integrations:mint-token`. *(MonoliYoda)*
+
+### Misc
+
+- **Docker build now copies the full `scripts/` directory** rather than just `scripts/data`, so `pnpm integrations:mint-token` and other operational scripts run inside the built image. *(MonoliYoda)*
+
+### Contributors
+
+- **MonoliYoda** - per-title map feature delegation, signature site-safety classifier, activity-stats integration endpoint, and the Docker scripts fix
+
 ## v1.0.0-rc.14
 
 Aperture now understands fixed-destination wormholes and can resolve one onto the map in a single click. Plus a batch of wormhole-picker polish, a terminal EOL stage, and three fixes.

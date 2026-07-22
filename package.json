@@ -1,6 +1,6 @@
 {
   "name": "aperture",
-  "version": "1.0.0-rc.14",
+  "version": "1.0.0-rc.15",
   "private": true,
   "packageManager": "pnpm@9.15.9",
   "engines": {
