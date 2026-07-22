@@ -4,6 +4,16 @@ import type { Session } from 'next-auth';
 import { db } from '@/db/client';
 import { apCharacter, apMap } from '@/db/schema';
 import { viewableMapPredicate } from '@/lib/auth/rights';
+import {
+  activityKindExclusion,
+  bucketStart,
+  emptyTriplet,
+  KIND_MAP,
+  toISODate,
+  type ActivityTriplet,
+} from './activityShaping';
+
+export type { ActivityTriplet } from './activityShaping';
 
 /**
  * Server-side activity-statistics reader over the
@@ -29,12 +39,6 @@ import { viewableMapPredicate } from '@/lib/auth/rights';
 
 export type ActivityStatScope = 'private' | 'corp' | 'alliance';
 export type ActivityStatPeriod = 'week' | 'month' | 'year';
-
-export interface ActivityTriplet {
-  create: number;
-  update: number;
-  delete: number;
-}
 
 export interface ActivityStatRow {
   /** Account main character id as a string (bigint isn't JSON-safe); `'0'` = unknown. */
@@ -80,20 +84,6 @@ const MONTH_NAMES = [
   'November',
   'December',
 ];
-
-// `kind` → [group, action]. Drives the triplet columns; `map.*` kinds never
-// reach here (filtered in SQL). System uses added/updated/removed verbs.
-const KIND_MAP: Record<string, [keyof Pick<ActivityStatRow, 'system' | 'connection' | 'signature'>, keyof ActivityTriplet]> = {
-  'system.added': ['system', 'create'],
-  'system.updated': ['system', 'update'],
-  'system.removed': ['system', 'delete'],
-  'connection.create': ['connection', 'create'],
-  'connection.update': ['connection', 'update'],
-  'connection.delete': ['connection', 'delete'],
-  'signature.create': ['signature', 'create'],
-  'signature.update': ['signature', 'update'],
-  'signature.delete': ['signature', 'delete'],
-};
 
 interface ActorScopeRow {
   authzLevel: 'member' | 'admin';
@@ -144,18 +134,6 @@ function parseAnchor(anchor: string | undefined): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-/** Normalise a date to the start of its bucket for the given period (UTC midnight). */
-function bucketStart(date: Date, period: ActivityStatPeriod): Date {
-  const y = date.getUTCFullYear();
-  const m = date.getUTCMonth();
-  if (period === 'year') return new Date(Date.UTC(y, 0, 1));
-  if (period === 'month') return new Date(Date.UTC(y, m, 1));
-  // week → Monday of the ISO week.
-  const day = date.getUTCDay(); // 0=Sun..6=Sat
-  const offset = day === 0 ? -6 : 1 - day;
-  return new Date(Date.UTC(y, m, date.getUTCDate() + offset));
-}
-
 /** Shift a normalised bucket start by `n` whole buckets. */
 function shiftBucket(start: Date, n: number, period: ActivityStatPeriod): Date {
   const y = start.getUTCFullYear();
@@ -178,10 +156,6 @@ function isoYearWeek(date: Date): { year: number; week: number } {
   firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDay + 3);
   const week = 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 86400000));
   return { year, week };
-}
-
-function toISODate(date: Date): string {
-  return date.toISOString().slice(0, 10);
 }
 
 function formatLabel(start: Date, period: ActivityStatPeriod): string {
@@ -274,8 +248,7 @@ export async function loadActivityStats(input: {
       LEFT JOIN ap_character c ON c.id = r.character_id
       LEFT JOIN ap_user u ON u.id = c.user_id
       WHERE r.map_id IN (${idList})
-        AND r.kind NOT LIKE 'map.%'
-        AND r.kind <> 'system.moved'
+        AND ${activityKindExclusion(sql.raw('r.kind'))}
       GROUP BY 1, 2, 3
     )
     SELECT main_id, to_char(day, 'YYYY-MM-DD') AS day, kind, total
@@ -291,7 +264,6 @@ export async function loadActivityStats(input: {
     total: number;
     series: number[];
   }
-  const emptyTriplet = (): ActivityTriplet => ({ create: 0, update: 0, delete: 0 });
   const accById = new Map<string, Acc>();
 
   for (const row of result.rows) {

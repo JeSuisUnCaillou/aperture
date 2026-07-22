@@ -2,6 +2,7 @@ import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 // Type-only (erased at compile) — `Layout` is RGL's `readonly LayoutItem[]`. Safe to
 // pull into this server-imported barrel; no runtime client/server coupling.
 import type { Layout } from 'react-grid-layout';
+import type { SignatureActivity } from '@/lib/map/siteActivity';
 import type {
   apAccessGrant,
   apCharacter,
@@ -51,6 +52,7 @@ import type {
   authzLevel,
   errorLevel,
   errorSource,
+  mapCapability,
   mapRight,
   mapType,
   roleSource,
@@ -197,6 +199,7 @@ export type NewApStructureEvent = InferInsertModel<typeof apStructureEvent>;
 // Enum unions. `pgEnum` exposes its values via `.enumValues`; the
 // `[number]` index extracts the union of string literals.
 export type AuthzLevel = (typeof authzLevel.enumValues)[number];
+export type MapCapability = (typeof mapCapability.enumValues)[number];
 export type MapRight = (typeof mapRight.enumValues)[number];
 export type MapType = (typeof mapType.enumValues)[number];
 export type RoleSource = (typeof roleSource.enumValues)[number];
@@ -312,6 +315,19 @@ export type {
   MapSettings,
   AdminMapListItem,
 } from '@/lib/map/loadMap';
+
+// Per-title feature-delegation view-model (src/app/(app)/actions/mapRoles.ts).
+/** One corp title with the capabilities currently delegated to it on a map. `view` is implicit and never listed. */
+export interface DelegationRole {
+  roleId: string;
+  label: string;
+  capabilities: MapCapability[];
+}
+
+/** Delegation state for a map's Roles & Permissions tab. `available` is false on non-corp maps (v1). */
+export type MapDelegationState =
+  | { available: false }
+  | { available: true; roles: DelegationRole[] };
 
 // Map import/export document + result types (src/lib/map/transfer.ts).
 export type { MapExportFile, ImportSummary, ImportResult } from '@/lib/map/transfer';
@@ -457,6 +473,9 @@ export type { SignatureGroupOption } from '@/lib/map/signatureGroups';
 // Localized signature Class catalog (src/lib/map/signatureClasses.ts).
 export type { SignatureClassKind, SignatureClassOption } from '@/lib/map/signatureClasses';
 
+// Site-safety (combat vs exploration) classifier (src/lib/map/siteActivity.ts).
+export type { SignatureActivity };
+
 // ESI opKey identifiers (map in src/lib/esi/opkeys.ts).
 export type { OpKey, OpDef } from '@/lib/esi/opkeys';
 
@@ -472,6 +491,13 @@ export type {
   ActivityStatRow,
   ActivityStatsResponse,
 } from '@/lib/stats/activity';
+
+// /api/integrations/activity-stats response shape (src/lib/integrations/activityStats.ts).
+export type {
+  IntegrationActivityBucket,
+  IntegrationCharacterActivity,
+  IntegrationActivityStatsResponse,
+} from '@/lib/integrations/activityStats';
 
 // Manager audit-console view-models + query contract (src/lib/map/audit.ts).
 export type {
@@ -593,6 +619,8 @@ export type SigSearchFilters = {
   includeAnomalies: boolean;
   /** Show sigs classed as Cosmic Signature. Sigs with no group bypass this. */
   includeSignatures: boolean;
+  /** Effective site-safety to include; `null` = any. */
+  activity: SignatureActivity | null;
 };
 
 // --- Observability: health probe (Phase 1) ---

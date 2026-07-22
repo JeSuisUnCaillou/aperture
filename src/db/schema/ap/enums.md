@@ -47,11 +47,17 @@
 ### mapRight
 `pgEnum('map_right', ['map_create', 'map_update', 'map_delete', 'map_import', 'map_export', 'map_share'])` — the map-management rights vocabulary, reserved for the future title-delegation overlay (R4). No table stores these (the `ap_corporation_right` matrix was retired in 0041); at the baseline the mutate guards take a `MapRight` argument but ignore it (authority is the binary `canManageMap`).
 
+### mapCapability
+`pgEnum('map_capability', ['view', 'audit_view', 'settings_manage', 'webhooks_manage', 'map_import', 'map_export', 'map_delete'])` — the per-map delegatable feature surface on `ap_map_role_access.capability` (added migration 0056). Each value names one director-gated feature a corp title can be granted on a single map. `view` is the role→map view overlay (any feature grant implies view); the rest map one-to-one onto the director features (audit log, settings, webhooks, import, export, delete). Distinct from `map_right`, which mixes in non-delegatable, non-per-map values and lacks the `audit_view`/`settings_manage`/`webhooks_manage` verbs. Directors/owners/admins hold every capability implicitly (`canManageMap`), so a grant only ever adds a title.
+
 ### signatureGroupKey
 `pgEnum('signature_group_key', ['combat', 'relic', 'data', 'gas', 'wormhole', 'ore', 'ghost'])` — scanner-level group of a cosmic signature (the seven keys EVE's probe scanner emits in its "Group" column). Nullable on `ap_map_signature.group_key`; replaced the prior `group_id` FK to `universe_group` (migration 0015), which couldn't represent the cosmic six.
 
 ### signatureClassKind
 `pgEnum('signature_class_kind', ['signature', 'anomaly'])` — whether a scanner entry must be scanned down (`signature`) or is instantly warpable (`anomaly`). Paste-derived from EVE's localized "Cosmic Signature" / "Cosmic Anomaly" Class column via `signatureClassKind` (`src/lib/map/signatureClasses.ts`). Nullable on `ap_map_signature.class_kind` (legacy + low-information manual rows have no known kind). Added migration 0045.
+
+### signatureActivity
+`pgEnum('signature_activity', ['combat', 'exploration'])` — site-safety of a cosmic signature: whether running the site pits you against rats (`combat`) or is an unguarded scan-down (`exploration`). The override axis behind `ap_map_signature.activity_override`; the derived default comes from `siteActivity` (`src/lib/map/siteActivity.ts`). Orthogonal to `signature_group_key` (a `relic` site can be a `combat` activity), so it is its own type. Added migration 0048.
 
 ### roleSource
 `pgEnum('role_source', ['builtin', 'corp_title', 'external'])` — where an `ap_role` row originates. `corp_title` rows are mirrored from EVE corporation titles; `external_ref` is `'<corp_id>:<title_id>'`. `external` rows come from Discord/third-party syncs.

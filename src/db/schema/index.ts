@@ -34,3 +34,4 @@ export * from './ap/alliance';
 export * from './ap/role';
 export * from './ap/structure';
 export * from './ap/structure_event';
+export * from './ap/integration_token';

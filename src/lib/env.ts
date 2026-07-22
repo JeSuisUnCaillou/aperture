@@ -43,6 +43,14 @@ const schema = z
     // token admits nothing (the route 401s), so enabling without a token is a
     // closed door rather than an open one.
     METRICS_TOKEN: z.string().default(''),
+    // Opt-in `/api/integrations/*` group (machine-to-machine, token-authenticated
+    // data feeds — see docs/spec/integration-activity-stats.md). Off by default;
+    // with it disabled every route in the group 404s. Per-token auth (not a
+    // single shared secret) lives in `ap_integration_token`.
+    INTEGRATIONS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     // Phase 6 instance alerting. Two Discord webhooks, both optional: the alert
     // loop no-ops when both are empty. `ALERT_WEBHOOK_URL` is the verbose
     // operator channel (PII-scrubbed detail); `STATUS_WEBHOOK_URL` is the terse,

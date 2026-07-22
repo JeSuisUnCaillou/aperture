@@ -2,9 +2,11 @@ import { z } from 'zod';
 import {
   connectionScope,
   eolStage,
+  mapCapability,
   mapNoteSeverity,
   mapScope,
   mapType,
+  signatureActivity,
   signatureClassKind,
   signatureGroupKey,
   systemStatus,
@@ -119,7 +121,11 @@ const mapScopeEnum = z.enum(mapScope.enumValues);
 const mapTypeEnum = z.enum(mapType.enumValues);
 const signatureGroupKeyEnum = z.enum(signatureGroupKey.enumValues);
 const signatureClassKindEnum = z.enum(signatureClassKind.enumValues);
+const signatureActivityEnum = z.enum(signatureActivity.enumValues);
 const mapNoteSeverityEnum = z.enum(mapNoteSeverity.enumValues);
+// `view` is implicit (any feature grant implies it) and never rides a delegation
+// event — only the six director features are grantable/revocable.
+const delegatableCapabilityEnum = z.enum(mapCapability.enumValues).exclude(['view']);
 
 const eventId = z.number().int().positive();
 
@@ -172,6 +178,7 @@ const signatureBody = {
   sigId: z.string(),
   groupKey: signatureGroupKeyEnum.nullable(),
   classKind: signatureClassKindEnum.nullable(),
+  activityOverride: signatureActivityEnum.nullable(),
   typeId: z.number().int().nullable(),
   eolStage: eolStageEnum,
   wormholeCode: z.string().nullable(),
@@ -283,6 +290,7 @@ export const mapEventPayloadSchema = z.discriminatedUnion('kind', [
     sigId: z.string().optional(),
     groupKey: signatureGroupKeyEnum.nullable().optional(),
     classKind: signatureClassKindEnum.nullable().optional(),
+    activityOverride: signatureActivityEnum.nullable().optional(),
     typeId: z.number().int().nullable().optional(),
     eolStage: eolStageEnum.optional(),
     wormholeCode: z.string().nullable().optional(),
@@ -365,13 +373,32 @@ export const mapEventPayloadSchema = z.discriminatedUnion('kind', [
   // COMMIT, so subscribers receive it even though the source event row is
   // cascaded out by the parent DELETE.
   z.object({ kind: z.literal('map.purge'), eventId, id: z.string() }),
+  // A director grants/revokes one delegatable feature to a corp title. The
+  // title's label and the capability ride the payload (self-contained, like
+  // `system.added` carrying its name) so the audit console and Discord history
+  // name the title without a role lookup.
+  z.object({
+    kind: z.literal('access.granted'),
+    eventId,
+    roleId: z.string(),
+    roleName: z.string(),
+    capability: delegatableCapabilityEnum,
+  }),
+  z.object({
+    kind: z.literal('access.revoked'),
+    eventId,
+    roleId: z.string(),
+    roleName: z.string(),
+    capability: delegatableCapabilityEnum,
+  }),
 ]);
 
 export type MapEventPayload = z.infer<typeof mapEventPayloadSchema>;
 
 /**
- * Seeded `ap_event_kind` values (migrations 0004 + 0014). The discriminator set.
- * Includes `map.restore` and `map.purge` for the admin maps panel.
+ * Seeded `ap_event_kind` values (migrations 0004 + 0014 + 0057). The discriminator
+ * set. Includes `map.restore`/`map.purge` for the admin maps panel and
+ * `access.granted`/`access.revoked` for per-title feature delegation.
  */
 export const MAP_EVENT_KINDS = [
   'system.added',
@@ -391,6 +418,8 @@ export const MAP_EVENT_KINDS = [
   'map.delete',
   'map.restore',
   'map.purge',
+  'access.granted',
+  'access.revoked',
 ] as const;
 
 export type MapEventKind = (typeof MAP_EVENT_KINDS)[number];

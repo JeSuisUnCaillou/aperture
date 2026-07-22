@@ -379,6 +379,34 @@
       "when": 1780208400000,
       "tag": "0054_wormhole_target_system",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1780224000000,
+      "tag": "0055_signature_activity_override",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1780227600000,
+      "tag": "0056_map_role_capability",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1780231200000,
+      "tag": "0057_access_event_kinds",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1780232400000,
+      "tag": "0058_integration_token",
+      "breakpoints": true
     }
   ]
 }
