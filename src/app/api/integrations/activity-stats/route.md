@@ -1,6 +1,6 @@
 ## activity-stats/route.ts
 
-**Purpose:** `POST /api/integrations/activity-stats` — machine-to-machine, token-authenticated per-character map-activity feed for external consumers (first consumer: Roster).
+**Purpose:** `POST /api/integrations/activity-stats` — machine-to-machine, token-authenticated per-character map-activity feed for external consumers.
 **File:** `src/app/api/integrations/activity-stats/route.ts`
 
 ---
