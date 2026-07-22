@@ -22,7 +22,8 @@
     "seed:demo-presence": "tsx scripts/seed-demo-presence.ts",
     "worker:dev": "tsx scripts/worker-dev.ts",
     "worker:once": "tsx scripts/worker-once.ts",
-    "jobs:status": "tsx scripts/jobs-status.ts"
+    "jobs:status": "tsx scripts/jobs-status.ts",
+    "integrations:mint-token": "tsx scripts/integrations-mint-token.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

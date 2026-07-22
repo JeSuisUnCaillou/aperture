@@ -452,6 +452,13 @@ export const apertureConfig = {
 
   /** `stack` / `componentStack` cap (chars) on an ingested client error. */
   CLIENT_ERROR_STACK_MAX_LENGTH: 8_000,
+
+  /**
+   * Max `characterIds` a single `/api/integrations/activity-stats` request may
+   * bound its result to. Bounds response size and query fan-out; callers over
+   * the cap page across multiple requests (400 on overflow).
+   */
+  INTEGRATION_MAX_CHARACTER_IDS: 500,
 } as const;
 
 export type ApertureConfig = typeof apertureConfig;

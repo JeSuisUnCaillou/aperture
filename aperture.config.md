@@ -74,6 +74,9 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 - `CLIENT_ERROR_MAX_PER_SESSION`, `CLIENT_ERROR_MAX_GLOBAL` — per-session and global caps; exceeding either drops the report (429) without writing, so a browser render loop can't flood `ap_error_log`.
 - `CLIENT_ERROR_MESSAGE_MAX_LENGTH`, `CLIENT_ERROR_STACK_MAX_LENGTH` — truncation caps on the ingested `message` and `stack`/`componentStack` before persistence.
 
+**Integrations API**
+- `INTEGRATION_MAX_CHARACTER_IDS` — max `characterIds` a single `/api/integrations/activity-stats` request may bound its result to (400 on overflow).
+
 Per-task cron expressions live as `cron` strings on each task module in `src/lib/jobs/tasks/`, not here.
 
 ### ApertureConfig

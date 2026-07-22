@@ -492,6 +492,13 @@ export type {
   ActivityStatsResponse,
 } from '@/lib/stats/activity';
 
+// /api/integrations/activity-stats response shape (src/lib/integrations/activityStats.ts).
+export type {
+  IntegrationActivityBucket,
+  IntegrationCharacterActivity,
+  IntegrationActivityStatsResponse,
+} from '@/lib/integrations/activityStats';
+
 // Manager audit-console view-models + query contract (src/lib/map/audit.ts).
 export type {
   AuditEventCategory,

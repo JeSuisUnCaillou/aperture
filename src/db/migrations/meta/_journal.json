@@ -400,6 +400,13 @@
       "when": 1780231200000,
       "tag": "0057_access_event_kinds",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1780232400000,
+      "tag": "0058_integration_token",
+      "breakpoints": true
     }
   ]
 }
