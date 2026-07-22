@@ -49,6 +49,6 @@ COPY --from=build /app/.next ./.next
 COPY package.json pnpm-lock.yaml tsconfig.json next.config.ts aperture.config.ts drizzle.config.ts server.ts ./
 COPY src ./src
 COPY public ./public
-COPY scripts/data ./scripts/data
+COPY scripts ./scripts
 EXPOSE 3003
 CMD ["pnpm", "start"]
