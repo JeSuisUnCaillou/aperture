@@ -719,7 +719,7 @@ function ConnectionItems({
       </MenuSubmenu>
 
       <MenuSubmenu>
-        <MenuSubmenuTrigger inset>Jump mass</MenuSubmenuTrigger>
+        <MenuSubmenuTrigger inset>Ship size</MenuSubmenuTrigger>
         <MenuSubmenuContent>
           <MenuRadioGroup
             value={connection.jumpMassClass ?? NONE_JUMP_MASS}

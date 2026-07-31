@@ -465,7 +465,7 @@ function ConnectionInspector({
           </Select>
         </Row>
 
-        <Row label="Jump mass">
+        <Row label="Ship size">
           <Select<string>
             value={jumpMassValue}
             onValueChange={(v) =>
