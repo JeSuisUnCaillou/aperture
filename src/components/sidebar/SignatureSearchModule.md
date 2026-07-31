@@ -21,7 +21,7 @@ The activity control is a tri-state Any / Combat / Exploration select. Each resu
 ### Behaviour & Interactions
 - Name input is debounced 150ms before firing `onFiltersChange`; a `filtersRef` (synced via `useLayoutEffect`) keeps the debounce callback from clobbering concurrent non-name filter edits.
 - Sort headers (Sig / System / Age) toggle asc/desc; clicking a new field resets to asc.
-- System-class toggle buttons multi-select; colored via `systemClassColor`.
+- System-class toggle buttons multi-select; colored via `systemClassColor`. Each button carries one or more `universe_system.security` labels and is active only when all of them are selected; the `Shattered` button carries C13–C18 (small shattered plus the five Drifter classes) as a single toggle.
 - Type toggle buttons (Anomalies / Signatures) filter by `sig.classKind`; a sig with an unknown class (neither) ignores them and always shows.
 - Results computed by `buildSigSearchResults` (pure, client-side); `now` ticks every 30s via a `setInterval` effect, so the Age column, age sort, and max-age filter stay live without other interaction. 30s matches the Age label's minute-floor granularity while keeping the `useMemo` from recomputing every render.
 - Unlike the former dialog, the panel persists open after navigation — `onNavigate` does not close anything.
