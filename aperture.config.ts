@@ -125,6 +125,24 @@ export const apertureConfig = {
   WS_HEALTH_STALE_MS: 45_000,
 
   /**
+   * A presence-session reconnect within this window of the prior session's
+   * `ended_at` adopts the still-open row instead of opening a second one, so
+   * per-character presence intervals never overlap and need no interval
+   * merging on read.
+   */
+  PRESENCE_SESSION_GAP_MS: 300_000,
+
+  /**
+   * A presence session is "live" while `ended_at` is newer than this — 2x
+   * `WS_HEARTBEAT_MS`, tolerating one missed heartbeat tick before a session
+   * reads as ended.
+   */
+  PRESENCE_LIVE_GRACE_MS: 60_000,
+
+  /** `ap_character_presence` prune horizon, in days. */
+  PRESENCE_RETENTION_DAYS: 400,
+
+  /**
    * Major trade hubs the read-only route module reports gate-jump distance to.
    * EVE solar-system IDs. Ordered for display.
    *
@@ -459,6 +477,20 @@ export const apertureConfig = {
    * the cap page across multiple requests (400 on overflow).
    */
   INTEGRATION_MAX_CHARACTER_IDS: 500,
+
+  /**
+   * `POST /api/integrations/presence-sessions` window when `from` is omitted:
+   * `to` minus this many days. Sessions are far more numerous than daily
+   * activity rollup rows, so unlike `activity-stats` the window can't default
+   * to unbounded.
+   */
+  INTEGRATION_PRESENCE_DEFAULT_WINDOW_DAYS: 90,
+
+  /**
+   * Widest `[from, to]` span `/api/integrations/presence-sessions` accepts; a
+   * wider request is a 400 telling the caller to page.
+   */
+  INTEGRATION_PRESENCE_MAX_WINDOW_DAYS: 366,
 } as const;
 
 export type ApertureConfig = typeof apertureConfig;
