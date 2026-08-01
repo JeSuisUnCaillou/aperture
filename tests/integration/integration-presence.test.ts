@@ -26,6 +26,7 @@ const OUTSIDER_ID = 99611002n;
 const QUIET_ID = 99611003n;
 const LIVE_ID = 99611004n;
 const WINDOW_ID = 99611005n;
+const FRACTION_ID = 99611006n;
 
 const characterIds = [CHAR_A, OUTSIDER_ID];
 
@@ -61,6 +62,7 @@ describe.skipIf(!run)('Integrations — presence (real Postgres)', () => {
       mkChar(QUIET_ID, 'Presence Quiet', userId, CORP_A),
       mkChar(LIVE_ID, 'Presence Live', userId, CORP_A),
       mkChar(WINDOW_ID, 'Presence Window', userId, CORP_A),
+      mkChar(FRACTION_ID, 'Presence Fraction', userId, CORP_A),
     ]);
   });
 
@@ -141,6 +143,36 @@ describe.skipIf(!run)('Integrations — presence (real Postgres)', () => {
     expect([...charBuckets.keys()].sort()).toEqual(['2026-07-04', '2026-07-05']);
     expect(charBuckets.get('2026-07-04')!.seconds).toBe(24 * 3600);
     expect(charBuckets.get('2026-07-05')!.seconds).toBe(2 * 3600);
+  });
+
+  it('reports whole seconds, rounding the bucket total rather than each session', async () => {
+    // Both sessions land in one bucket; each is sub-second-precise, so their
+    // fractions only sum to a round-up together (1800.4 + 10.4 = 1810.8).
+    await db.insert(apCharacterPresence).values([
+      {
+        characterId: FRACTION_ID,
+        corporationId: CORP_A,
+        startedAt: new Date('2026-07-20T10:00:00.000Z'),
+        endedAt: new Date('2026-07-20T10:30:00.400Z'),
+      },
+      {
+        characterId: FRACTION_ID,
+        corporationId: CORP_A,
+        startedAt: new Date('2026-07-20T12:00:00.000Z'),
+        endedAt: new Date('2026-07-20T12:00:10.400Z'),
+      },
+    ]);
+
+    const buckets = await loadPresenceBuckets({
+      corporationId: CORP_A,
+      characterIds: [FRACTION_ID],
+      from: '2026-07-20',
+      to: '2026-07-20',
+      granularity: 'daily',
+    });
+    const bucket = buckets.get(FRACTION_ID.toString())!.get('2026-07-20')!;
+    expect(bucket.sessions).toBe(2);
+    expect(bucket.seconds).toBe(1811);
   });
 
   it('the `live` flag reflects whether `ended_at` is within the live grace window', async () => {
@@ -239,10 +271,10 @@ async function cleanup() {
   await db.delete(apIntegrationToken).where(eq(apIntegrationToken.corporationId, CORP_A));
   await db
     .delete(apCharacterPresence)
-    .where(inArray(apCharacterPresence.characterId, [CHAR_A, OUTSIDER_ID, QUIET_ID, LIVE_ID, WINDOW_ID]));
+    .where(inArray(apCharacterPresence.characterId, [CHAR_A, OUTSIDER_ID, QUIET_ID, LIVE_ID, WINDOW_ID, FRACTION_ID]));
   await db
     .delete(apCharacter)
-    .where(inArray(apCharacter.id, [CHAR_A, OUTSIDER_ID, QUIET_ID, LIVE_ID, WINDOW_ID]));
+    .where(inArray(apCharacter.id, [CHAR_A, OUTSIDER_ID, QUIET_ID, LIVE_ID, WINDOW_ID, FRACTION_ID]));
   if (userId) {
     await db.delete(apUser).where(eq(apUser.id, userId));
     userId = 0;
