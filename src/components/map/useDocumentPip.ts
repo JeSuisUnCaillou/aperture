@@ -43,6 +43,43 @@ function cloneStyles(target: Window): void {
   }
 }
 
+const PIP_SIZE_STORAGE_KEY = 'aperture:pip-window-size';
+
+interface StoredPipSize {
+  width: number;
+  height: number;
+}
+
+// localStorage survives across sessions, unlike the PiP window itself which is
+// torn down and recreated on every open() — it's the only place a remembered
+// size can live.
+function readStoredPipSize(): StoredPipSize | null {
+  try {
+    const raw = window.localStorage.getItem(PIP_SIZE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof (parsed as StoredPipSize).width === 'number' &&
+      typeof (parsed as StoredPipSize).height === 'number'
+    ) {
+      return parsed as StoredPipSize;
+    }
+  } catch {
+    // Malformed or inaccessible storage (e.g. private browsing) — fall back to defaults.
+  }
+  return null;
+}
+
+function writeStoredPipSize(size: StoredPipSize): void {
+  try {
+    window.localStorage.setItem(PIP_SIZE_STORAGE_KEY, JSON.stringify(size));
+  } catch {
+    // Storage unavailable — the size just won't persist to the next session.
+  }
+}
+
 /**
  * Owns one Document Picture-in-Picture window's lifecycle. `open()` requests the
  * OS-level always-on-top window (must be called from a user gesture), clones the
@@ -62,9 +99,12 @@ export function useDocumentPip(): DocumentPipController {
 
   const open = useCallback(async (size?: { width?: number; height?: number }) => {
     if (typeof window === 'undefined' || !window.documentPictureInPicture) return;
+    // A remembered size (from the last time the user resized the window) always
+    // wins over the caller's requested default.
+    const stored = readStoredPipSize();
     const pip = await window.documentPictureInPicture.requestWindow({
-      width: size?.width ?? 320,
-      height: size?.height ?? 420,
+      width: stored?.width ?? size?.width ?? 320,
+      height: stored?.height ?? size?.height ?? 420,
     });
     cloneStyles(pip);
     // Mirror the .dark custom-variant class so themed tokens resolve identically.
@@ -72,6 +112,16 @@ export function useDocumentPip(): DocumentPipController {
     // Fill the whole window with the app surface so transparent gaps don't flash white.
     pip.document.body.className = 'bg-background text-foreground min-h-screen';
     pip.addEventListener('pagehide', () => setPipWindow(null), { once: true });
+
+    // Persist the live size on resize (debounced) so the next open() restores it.
+    let resizeTimer: ReturnType<typeof setTimeout>;
+    pip.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        writeStoredPipSize({ width: pip.innerWidth, height: pip.innerHeight });
+      }, 300);
+    });
+
     setPipWindow(pip);
   }, []);
 
