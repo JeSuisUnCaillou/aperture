@@ -155,9 +155,6 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
       characterId,
     });
 
-    // Step 4 — list the maps that should see this character's broadcast / fan-out.
-    const trackedMapIds = await loadActiveTrackedMaps(characterId);
-
     // Step 5 — offline tick: stamp the flag, broadcast the breadcrumb on every
     // tracked map channel, push the next tick out to the slower cadence.
     if (!onlineProbe.online) {
@@ -168,7 +165,7 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
       const reenqueuedInMs = apertureConfig.LOCATION_POLL_OFFLINE_MS;
       await reenqueue(helpers, payload, reenqueuedInMs);
       await broadcastCharacterUpdate({
-        trackedMapIds,
+        trackedMapIds: await loadActiveTrackedMaps(characterId),
         characterId,
         characterName: character.name,
         userId: character.userId,
@@ -204,6 +201,14 @@ async function poll(payload: LocationPollPayload, helpers: JobHelpers): Promise<
 
     const reenqueuedInMs = apertureConfig.LOCATION_POLL_ONLINE_MS;
     await reenqueue(helpers, payload, reenqueuedInMs);
+
+    // The maps that see this tick's fan-out are read *here*, after the ESI phase
+    // and immediately before they're used. A user untracking a character mid-tick
+    // deletes the row and broadcasts `characterLogout`; a map list read before
+    // the ESI round-trip would then fold onto — and re-broadcast the pilot's
+    // breadcrumb to — a map they just left, resurrecting them on the roster with
+    // no further tick to correct it.
+    const trackedMapIds = await loadActiveTrackedMaps(characterId);
 
     // Step 7 — classify + fan-out. First poll (`previousSystemId === null`)
     // and same-system ticks both short-circuit. Gate jumps and `teleport`

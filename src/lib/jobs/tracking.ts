@@ -86,7 +86,14 @@ export interface StopTrackingArgs {
 }
 
 /**
- * Delete the (map, character) tracking row. Returns whether a row was removed.
+ * Delete the (map, character) tracking row and tell that map's live viewers to
+ * drop the pilot. Returns whether a row was removed.
+ *
+ * The tracking row is what `loadMapPresence` joins off, so an untracked pilot is
+ * absent from a fresh page load; the `characterLogout` broadcast makes the live
+ * roster agree without a refresh. Nothing else would: once the row is gone the
+ * poll stops broadcasting on this map, so no `characterUpdate` ever corrects the
+ * stale entry.
  *
  * Does **not** cancel the in-flight poll job. The handler's first action is to
  * check whether any tracking rows still exist for the character; on the next
@@ -104,7 +111,9 @@ export async function stopTrackingCharacter(args: StopTrackingArgs): Promise<{ r
       ),
     )
     .returning({ mapId: apMapCharacterTracking.mapId });
-  return { removed: deleted.length > 0 };
+  if (deleted.length === 0) return { removed: false };
+  await broadcastCharacterLogout(args.mapId, [args.characterId]);
+  return { removed: true };
 }
 
 /**
