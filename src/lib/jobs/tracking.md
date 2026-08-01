@@ -13,7 +13,7 @@
 Returns `{ ok: true, alreadyTracked }`.
 
 ### stopTrackingCharacter({ mapId, characterId }): { removed }
-`DELETE` the tracking row. Does NOT cancel the in-flight poll job — the handler checks tracking-row count on entry and exits with `{ stopped: 'no-tracking' }` on the tick after the last row goes away. Avoiding an external cancel keeps the lifecycle race-free.
+`DELETE` the tracking row; when a row was actually removed, `broadcastCharacterLogout(mapId, [characterId])` so that map's live rosters drop the pilot. The broadcast is what keeps a live viewer agreeing with a fresh page load — `loadMapPresence` joins off the tracking row, and once the row is gone no `characterUpdate` is ever emitted on that map to correct a stale entry. Does NOT cancel the in-flight poll job — the handler checks tracking-row count on entry and exits with `{ stopped: 'no-tracking' }` on the tick after the last row goes away. Avoiding an external cancel keeps the lifecycle race-free.
 
 ### pruneTrackingForLostAccess(characterId): Promise<{ prunedMapIds }>
 Drop a character's tracking on every **live** map they can no longer view, and broadcast a `characterLogout` on each so live rosters forget them. Called from the `character-cleanup` affiliation sweep after a pilot's corp/alliance change is detected and `syncCharacterAuthz` has refreshed the cached affiliation: for each tracked map, `canViewMap(characterId, mapId)` is re-evaluated; a `false` result deletes the `(map, character)` row and fires `broadcastCharacterLogout`. Maps the pilot can still view (own private maps, a corp they stayed in) are untouched. The location-poll self-exits on its next tick once no tracking rows remain. Returns the pruned map ids.
@@ -35,5 +35,5 @@ The per-map default: the first time an account opens a map, auto-track all its *
 
 ### Depends On
 - `@/lib/auth/rights` (`canViewMap`) — the view-access re-check in `pruneTrackingForLostAccess`.
-- `@/lib/realtime/characterLogout` (`broadcastCharacterLogout`) — roster eviction on prune.
+- `@/lib/realtime/characterLogout` (`broadcastCharacterLogout`) — roster eviction on stop and on prune.
 - `@/lib/log/logger` (`getLogger('job')`) — the start-tracking info line.

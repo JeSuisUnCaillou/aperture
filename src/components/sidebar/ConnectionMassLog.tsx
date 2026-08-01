@@ -77,7 +77,7 @@ export function ConnectionMassLog({
         <span className="text-[10px] text-muted-foreground">Mass log</span>
         {connection.jumpMassClass ? (
           <span className="text-[10px] text-muted-foreground">
-            max/jump {connection.jumpMassClass.toUpperCase()}
+            ship size {connection.jumpMassClass.toUpperCase()}
           </span>
         ) : null}
       </div>

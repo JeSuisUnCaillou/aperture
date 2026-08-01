@@ -12,7 +12,7 @@
 
 ### Renders
 A bordered block under the connection inspector's expiry hint: a "Mass log" header (with the
-`jumpMassClass` max-per-jump hint), one row per logged jump (pilot · ship · time-ago · mass in kt),
+`jumpMassClass` ship-size hint), one row per logged jump (pilot · ship · time-ago · mass in kt),
 and a cumulative total. Loading / failed / empty states are inline text.
 
 ### Behaviour & Interactions

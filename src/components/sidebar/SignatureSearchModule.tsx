@@ -32,25 +32,42 @@ const CLASS_KIND_TOGGLES: { kind: SignatureClassKind; label: string; title: stri
   { kind: 'signature', label: 'Sigs', title: 'Signatures' },
 ];
 
-const SECURITY_CLASS_GROUPS: { heading: string; options: { value: string; label: string }[] }[] = [
+// C13 (small shattered) and the five Drifter classes are all shattered space and
+// share one toggle rather than six.
+const SHATTERED_CLASSES = ['C13', 'C14', 'C15', 'C16', 'C17', 'C18'];
+
+type SecurityClassOption = { key: string; label: string; title?: string; classes: string[] };
+
+const SECURITY_CLASS_GROUPS: { heading: string; options: SecurityClassOption[] }[] = [
   {
     heading: 'Wormhole',
     options: [
-      { value: 'C1', label: 'C1' },
-      { value: 'C2', label: 'C2' },
-      { value: 'C3', label: 'C3' },
-      { value: 'C4', label: 'C4' },
-      { value: 'C5', label: 'C5' },
-      { value: 'C6', label: 'C6' },
+      { key: 'C1', label: 'C1', classes: ['C1'] },
+      { key: 'C2', label: 'C2', classes: ['C2'] },
+      { key: 'C3', label: 'C3', classes: ['C3'] },
+      { key: 'C4', label: 'C4', classes: ['C4'] },
+      { key: 'C5', label: 'C5', classes: ['C5'] },
+      { key: 'C6', label: 'C6', classes: ['C6'] },
     ],
   },
   {
     heading: 'K-Space',
     options: [
-      { value: 'H',   label: 'HS' },
-      { value: 'L',   label: 'LS' },
-      { value: '0.0', label: 'NS' },
-      { value: 'P',   label: 'P' },
+      { key: 'H',   label: 'HS', classes: ['H'] },
+      { key: 'L',   label: 'LS', classes: ['L'] },
+      { key: '0.0', label: 'NS', classes: ['0.0'] },
+      { key: 'P',   label: 'P',  classes: ['P'] },
+    ],
+  },
+  {
+    heading: 'Shattered',
+    options: [
+      {
+        key: 'shattered',
+        label: 'Shattered',
+        title: 'Shattered and Drifter systems (C13–C18)',
+        classes: SHATTERED_CLASSES,
+      },
     ],
   },
 ];
@@ -123,13 +140,14 @@ export function SignatureSearchModule({
     }
   }
 
-  function toggleSecClass(value: string) {
+  function toggleSecClasses(classes: string[]) {
     const current = filters.securityClasses;
+    const active = classes.every((c) => current.includes(c));
     onFiltersChange({
       ...filters,
-      securityClasses: current.includes(value)
-        ? current.filter((c) => c !== value)
-        : [...current, value],
+      securityClasses: active
+        ? current.filter((c) => !classes.includes(c))
+        : [...current, ...classes.filter((c) => !current.includes(c))],
     });
   }
 
@@ -257,17 +275,18 @@ export function SignatureSearchModule({
             {SECURITY_CLASS_GROUPS.map((group) => (
               <div key={group.heading} className="flex items-center gap-1">
                 {group.options.map((opt) => {
-                  const active = filters.securityClasses.includes(opt.value);
-                  const color = systemClassColor(opt.value);
+                  const active = opt.classes.every((c) => filters.securityClasses.includes(c));
+                  const color = systemClassColor(opt.classes[0]);
                   return (
                     <Button
-                      key={opt.value}
+                      key={opt.key}
                       type="button"
                       variant="outline"
                       size="sm"
+                      title={opt.title}
                       className="h-7 px-2 text-xs"
                       style={active ? { color, borderColor: color } : { color }}
-                      onClick={() => toggleSecClass(opt.value)}
+                      onClick={() => toggleSecClasses(opt.classes)}
                     >
                       {opt.label}
                     </Button>

@@ -148,6 +148,26 @@ export type ConnectionMassLogEntry = {
   jumpedAt: string;
 };
 
+export type ShipClass =
+  | 'capsule'
+  | 'shuttle'
+  | 'corvette'
+  | 'frigate'
+  | 'destroyer'
+  | 'cruiser'
+  | 'battlecruiser'
+  | 'battleship'
+  | 'dreadnought'
+  | 'carrier'
+  | 'supercarrier'
+  | 'titan'
+  | 'mining-frigate'
+  | 'mining-destroyer'
+  | 'mining-barge'
+  | 'industrial'
+  | 'industrial-command'
+  | 'industrial-capital';
+
 export type ApMapSignature = InferSelectModel<typeof apMapSignature>;
 export type NewApMapSignature = InferInsertModel<typeof apMapSignature>;
 
@@ -498,6 +518,15 @@ export type {
   IntegrationCharacterActivity,
   IntegrationActivityStatsResponse,
 } from '@/lib/integrations/activityStats';
+
+// Presence projections over ap_character_presence (src/lib/integrations/presence.ts) —
+// /api/integrations/presence-sessions response shape and the activity-stats `online` block.
+export type {
+  IntegrationPresenceSession,
+  IntegrationCharacterPresence,
+  IntegrationPresenceResponse,
+  IntegrationOnlineSummary,
+} from '@/lib/integrations/presence';
 
 // Manager audit-console view-models + query contract (src/lib/map/audit.ts).
 export type {

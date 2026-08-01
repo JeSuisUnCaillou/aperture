@@ -34,6 +34,7 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 - `MAP_EVENT_NOTIFY_CHANNEL_PREFIX` — `pg_notify` channel prefix for `ap_map_event` fanout.
 - `WS_PATH` — WebSocket upgrade path on the same Next.js deployment.
 - `WS_HEARTBEAT_MS`, `WS_RECONNECT_BASE_MS`, `WS_RECONNECT_MAX_MS`, `WS_HEALTH_STALE_MS` — heartbeat, client reconnect backoff, and the staleness threshold that flips the degraded-mode banner.
+- `PRESENCE_SESSION_GAP_MS` — reconnect window within which `ap_character_presence` adopts the still-open session instead of opening a second one. `PRESENCE_LIVE_GRACE_MS` (2x `WS_HEARTBEAT_MS`) — how fresh `ended_at` must be for a session to read as live. `PRESENCE_RETENTION_DAYS` — prune horizon for the presence table.
 
 **Map limits & display**
 - `ROUTE_HUBS` — trade hubs the route module reports jump distance to (EVE system IDs).
@@ -76,6 +77,7 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 
 **Integrations API**
 - `INTEGRATION_MAX_CHARACTER_IDS` — max `characterIds` a single `/api/integrations/activity-stats` request may bound its result to (400 on overflow).
+- `INTEGRATION_PRESENCE_DEFAULT_WINDOW_DAYS` (90) — `/api/integrations/presence-sessions` window when `from` is omitted, counted back from `to`. `INTEGRATION_PRESENCE_MAX_WINDOW_DAYS` (366) — widest `[from, to]` span accepted (400 on overflow).
 
 Per-task cron expressions live as `cron` strings on each task module in `src/lib/jobs/tasks/`, not here.
 

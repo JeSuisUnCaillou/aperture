@@ -6,6 +6,10 @@ import { runMigrations } from 'graphile-worker';
 import { db, pool } from '@/db/client';
 import { apCharacter, apMap, apMapCharacterTracking, apUser } from '@/db/schema';
 import { startTrackingCharacter, stopTrackingCharacter } from '@/lib/jobs/tracking';
+import { bus } from '@/lib/realtime/bus';
+import type { ServerToClientMessage } from '@/lib/realtime/protocol';
+
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Tracking is purely per-map: a
@@ -136,5 +140,54 @@ describe.skipIf(!run)('Stage 3 per-map tracking toggle (real Postgres)', () => {
   it('stopTrackingCharacter reports removed:false when no row exists', async () => {
     const stopped = await stopTrackingCharacter({ mapId: mapA, characterId: CHAR_A });
     expect(stopped).toEqual({ removed: false });
+  });
+
+  // A live viewer's roster is fed by the tracking row (`loadMapPresence` joins
+  // off it) and never corrected afterwards — once the row is gone the poll stops
+  // broadcasting on this map. Without the logout the pilot lingers until refresh.
+  //
+  // Arranged with a direct insert rather than `startTrackingCharacter`: enqueuing
+  // a real poll job hands it to whatever worker is attached to this database,
+  // whose token-loss path would delete the rows out from under the assertion.
+  it('stopTrackingCharacter broadcasts a characterLogout on that map only', async () => {
+    await db
+      .insert(apMapCharacterTracking)
+      .values([
+        { mapId: mapA, characterId: CHAR_A },
+        { mapId: mapB, characterId: CHAR_A },
+      ])
+      .onConflictDoNothing();
+
+    const onA: ServerToClientMessage[] = [];
+    const onB: ServerToClientMessage[] = [];
+    const unsubA = bus.subscribe(mapA, (msg) => onA.push(msg));
+    const unsubB = bus.subscribe(mapB, (msg) => onB.push(msg));
+    await delay(200); // let the bus register its LISTEN before pg_notify fires
+
+    await stopTrackingCharacter({ mapId: mapA, characterId: CHAR_A });
+    await delay(500); // pg_notify is fire-and-forget across connections
+    unsubA();
+    unsubB();
+
+    const logouts = onA.filter((m) => m.task === 'characterLogout');
+    expect(logouts).toHaveLength(1);
+    const only = logouts[0]!;
+    if (only.task !== 'characterLogout') throw new Error('expected characterLogout');
+    expect(only.load.characterIds).toEqual([Number(CHAR_A)]);
+    // mapB still tracks CHAR_A — its viewers must keep the pilot.
+    expect(onB.filter((m) => m.task === 'characterLogout')).toHaveLength(0);
+  });
+
+  it('a no-op stop broadcasts nothing', async () => {
+    const received: ServerToClientMessage[] = [];
+    const unsubscribe = bus.subscribe(mapA, (msg) => received.push(msg));
+    await delay(200);
+
+    const stopped = await stopTrackingCharacter({ mapId: mapA, characterId: CHAR_A });
+    await delay(500);
+    unsubscribe();
+
+    expect(stopped).toEqual({ removed: false });
+    expect(received.filter((m) => m.task === 'characterLogout')).toHaveLength(0);
   });
 });

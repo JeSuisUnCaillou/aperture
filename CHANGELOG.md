@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.0.0-rc.16
+
+Tracked pilots now show what they are flying, external tooling can read Aperture onlineness alongside activity, and untracking a character finally clears them off everyone else's map.
+
+### New features
+
+- **Ship-class icons for tracked pilots** - the pilot roster, the system presence popup and the Picture-in-Picture overlay all show an icon for the hull each tracked pilot is in, so a fleet's composition reads at a glance. Mining and industrial hulls whose SDE group is misleading (the Outrider is a command destroyer, but flies as a mining destroyer) are corrected to the class the game shows. *(Ionis)*
+- **Presence for the integrations API** - `POST /api/integrations/activity-stats` buckets are now emitted on activity-or-presence and carry an `online` block (seconds/sessions/last-seen), clipped to the requested window. A new `POST /api/integrations/presence-sessions` exposes token-scoped bounded-window intervals for consumers building `character_session`-style history. *(MonoliYoda)*
+
+### Improvements
+
+- **Shattered filter in signature search** - a single Shattered toggle covers C13 and the five Drifter classes C14 to C18, rather than needing a class picked one at a time. *(MonoliYoda)*
+- **"Jump mass" is now "Ship size"** in the connection context menu, the mass log and the inspector, matching how the sizes are actually talked about. *(MonoliYoda)*
+
+### Fixes
+
+- **Untracking a pilot removes them from other viewers' maps** - switching tracking off deleted the tracking row without telling anyone, so every other viewer kept the pilot on the map until they refreshed. Untracking now broadcasts the same eviction that a revoked-access prune does, and the location poll re-reads its map list immediately before fanning out so an in-flight tick can't resurrect a pilot who just left. *(MonoliYoda)*
+- **The Picture-in-Picture overlay reopens at the size you left it** - resized width and height persist across sessions instead of snapping back to the default on every open. *(MonoliYoda)*
+
+### Misc
+
+- **`db:generate` produces correct diffs again** - the drizzle-kit snapshot chain stopped at migration 0010 while 0011 to 0058 were hand-written, so generation diffed against a stale baseline. A fresh 0058 snapshot restores incremental generation. *(MonoliYoda)*
+
+### Contributors
+
+- **Ionis** - ship-class icons across the pilot roster, presence popup and PiP overlay
+- **MonoliYoda** - presence for the integrations API, the Shattered signature filter, the untracking and PiP-size fixes, and the drizzle snapshot rebaseline
+
 ## v1.0.0-rc.15
 
 This release lets directors delegate individual director-gated map features to specific EVE corporation titles, adds a derived combat/exploration classifier for signature sites, and opens a machine-to-machine activity-stats endpoint for external tooling.
