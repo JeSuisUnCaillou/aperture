@@ -25,6 +25,8 @@ const run = process.env.RUN_DB_TESTS === '1';
 const COOKIE_NAME = 'authjs.session-token';
 
 const PRESENCE_CHARACTER_ID = 99620001n;
+/** Owner of both test maps — `canViewMap` gates subscribe on real ownership. */
+const VIEWER_CHARACTER_ID = 90000001n;
 
 async function sessionCookie(characterId = '90000001', userId = 1): Promise<string> {
   const token = await encode({
@@ -67,24 +69,48 @@ describe.skipIf(!run)('realtime transport (WS + bus)', () => {
   let deletedMapId: bigint;
   let cookie: string;
   let presenceUserId: number;
+  let viewerUserId: number;
   const sockets: WebSocket[] = [];
 
   beforeAll(async () => {
     await migrate(db, { migrationsFolder: 'src/db/migrations' });
 
+    await db.delete(apCharacter).where(eq(apCharacter.id, VIEWER_CHARACTER_ID));
+    const [vu] = await db.insert(apUser).values({}).returning({ id: apUser.id });
+    viewerUserId = vu!.id;
+    await db.insert(apCharacter).values({
+      id: VIEWER_CHARACTER_ID,
+      userId: viewerUserId,
+      name: 'Realtime Test Pilot',
+      ownerHash: `hash-${VIEWER_CHARACTER_ID}`,
+      authzLevel: 'member',
+      status: 'active',
+    });
+
     const [m] = await db
       .insert(apMap)
-      .values({ scope: 'wh', type: 'private', name: 'rt-test-map' })
+      .values({
+        scope: 'wh',
+        type: 'private',
+        name: 'rt-test-map',
+        ownerCharacterId: VIEWER_CHARACTER_ID,
+      })
       .returning({ id: apMap.id });
     mapId = m!.id;
 
     const [d] = await db
       .insert(apMap)
-      .values({ scope: 'wh', type: 'private', name: 'rt-deleted-map', deletedAt: new Date() })
+      .values({
+        scope: 'wh',
+        type: 'private',
+        name: 'rt-deleted-map',
+        ownerCharacterId: VIEWER_CHARACTER_ID,
+        deletedAt: new Date(),
+      })
       .returning({ id: apMap.id });
     deletedMapId = d!.id;
 
-    cookie = await sessionCookie();
+    cookie = await sessionCookie(VIEWER_CHARACTER_ID.toString(), viewerUserId);
 
     await db.delete(apCharacter).where(eq(apCharacter.id, PRESENCE_CHARACTER_ID));
     const [pu] = await db.insert(apUser).values({}).returning({ id: apUser.id });
@@ -110,7 +136,9 @@ describe.skipIf(!run)('realtime transport (WS + bus)', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await db.delete(apMap).where(sql`${apMap.id} in (${mapId}, ${deletedMapId})`);
     await db.delete(apCharacter).where(eq(apCharacter.id, PRESENCE_CHARACTER_ID));
+    await db.delete(apCharacter).where(eq(apCharacter.id, VIEWER_CHARACTER_ID));
     await db.delete(apUser).where(eq(apUser.id, presenceUserId));
+    await db.delete(apUser).where(eq(apUser.id, viewerUserId));
     await pool.end();
   });
 

@@ -21,8 +21,7 @@ const FAKE_HELPERS = {} as unknown as JobHelpers;
 let mapId = 0n;
 
 type RollupRow = {
-  iso_year: number;
-  iso_week: number;
+  day: string;
   character_id: string;
   map_id: string;
   kind: string;
@@ -31,7 +30,7 @@ type RollupRow = {
 
 async function rollupRowsForMap(id: bigint): Promise<RollupRow[]> {
   const result = await db.execute<RollupRow>(
-    sql`SELECT iso_year, iso_week, character_id, map_id, kind, event_count
+    sql`SELECT day, character_id, map_id, kind, event_count
         FROM ap_activity_rollup
         WHERE map_id = ${id}
         ORDER BY kind`,

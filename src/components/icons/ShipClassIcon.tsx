@@ -17,6 +17,7 @@ export function ShipClassIcon({
     return <span className={`inline-block size-4 shrink-0 rounded-sm bg-muted ${className ?? ''}`} />;
   }
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- static 16px local icon, no Next loader needed
     <img
       src={`/ship-icons/${shipClass}.png`}
       alt={SHIP_CLASS_LABELS[shipClass]}

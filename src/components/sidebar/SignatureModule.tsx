@@ -930,6 +930,7 @@ function SignaturePanelBody({
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'sigId', desc: false }]);
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table manages its own memoization; the React Compiler correctly skips auto-memoizing this component, no stale-UI risk here.
   const table = useReactTable({
     data: filteredRows,
     columns: signatureColumns,
