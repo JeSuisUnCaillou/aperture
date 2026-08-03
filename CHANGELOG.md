@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.0.0-rc.17
+
+You can now share a live, read-only view of your chain with anyone via a link, systems with several holes on one side draw them properly fanned out, and tabs left open across a deploy tell you to reload.
+
+### New features
+
+- **Share your chain with a public link** - managers can mint an unguessable link that shows the map live to anyone, no login. Spectators get the chain plus a "directions in" board listing every k-space way in, with the sig to scan and the jumps to the nearest hub. *(MonoliYoda)*
+- **Multiple holes on one side of a system fan out** - connections leaving the same face of a node now each get their own attachment point and are ordered so they never stack or cross. A busy system finally reads at a glance. *(MonoliYoda)*
+- **A banner when the app has been updated** - after a deploy, an open tab is running an old version. Tabs now notice and offer a Reload button. A tab you left in the background reloads itself; a tab you are looking at never reloads from under you, so a half-typed intel note is safe. *(MonoliYoda)*
+
+### Fixes
+
+- **Fractional seconds in the integrations presence payload** - `online.seconds` could come back as a fraction, which strict consumers rejected. It is now always a whole number. *(MonoliYoda)*
+
+### Misc
+
+- **Spectator load is visible in metrics** - `/api/metrics` reports live spectator connections and upgrade outcomes, so a busy event can be told apart from spectators being turned away. *(MonoliYoda)*
+
+### Contributors
+
+- **MonoliYoda** - public map sharing, per-face connection fanning, the app-update banner, and the integrations presence fix
+
 ## v1.0.0-rc.16
 
 Tracked pilots now show what they are flying, external tooling can read Aperture onlineness alongside activity, and untracking a character finally clears them off everyone else's map.
