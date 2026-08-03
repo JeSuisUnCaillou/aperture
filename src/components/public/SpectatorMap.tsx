@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Background,
   ConnectionMode,
@@ -21,6 +21,14 @@ import type { PublicMapPresence, PublicMapViewData } from '@/types';
 // subscription, no per-account viewport memory. What is left is the same
 // picture, driven straight off the redacted snapshot.
 
+/** A whole way into the chain lit at once: the hops, and the systems they pass through. */
+export type SpectatorHighlight = {
+  /** `ap_map_system.id`s to ring. Endpoints of the highlighted connections ring too. */
+  systemIds: string[];
+  /** `ap_map_connection.id`s to lift, with their sig codes forced visible. */
+  connectionIds: string[];
+};
+
 // xyflow requires stable type maps; module scope guarantees it.
 const nodeTypes = { system: PublicSystemNode };
 const edgeTypes = { connection: PublicConnectionEdge };
@@ -30,15 +38,48 @@ const edgeTypes = { connection: PublicConnectionEdge };
 // arranged them in.
 const FIT_VIEW_OPTIONS = { padding: 0.15, maxZoom: 1.4 };
 
+// xyflow's 0.5 floor is above the zoom a long chain needs to fit a phone, and
+// `fitView` clamps to it — the reader lands mid-chain with the zoom-out and
+// fit buttons both already at their limit, and no way to see the rest.
+const MIN_ZOOM = 0.1;
+
 export function SpectatorMap({
   data,
-  highlightedSystemId,
+  highlight,
+  onPaneClick,
 }: {
   data: PublicMapViewData;
-  /** `ap_map_system.id` of the entrance row under the cursor, if any. */
-  highlightedSystemId: string | null;
+  /** The route currently lit, from a hovered or pinned entrances-board row. */
+  highlight: SpectatorHighlight;
+  /** Fires on a click anywhere off the chain, so a pinned route can be dismissed. */
+  onPaneClick: () => void;
 }) {
   const presenceBySystem = useMemo(() => presenceIndex(data.presence), [data.presence]);
+  const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
+
+  const securityBySystem = useMemo(
+    () => new Map(data.systems.map((s) => [s.id, s.security])),
+    [data.systems],
+  );
+
+  // Edge hover and board highlight merge into one set rather than running as
+  // parallel channels, so a hovered hole and a lit route read identically.
+  const litConnections = useMemo(() => {
+    const ids = new Set(highlight.connectionIds);
+    if (hoveredConnectionId) ids.add(hoveredConnectionId);
+    return ids;
+  }, [highlight.connectionIds, hoveredConnectionId]);
+
+  const litSystems = useMemo(() => {
+    const ids = new Set(highlight.systemIds);
+    for (const c of data.connections) {
+      if (litConnections.has(c.id)) {
+        ids.add(c.source);
+        ids.add(c.target);
+      }
+    }
+    return ids;
+  }, [data.connections, highlight.systemIds, litConnections]);
 
   const nodes = useMemo<Node<PublicSystemNodeData>[]>(
     () =>
@@ -49,10 +90,10 @@ export function SpectatorMap({
         data: {
           ...s,
           presence: presenceBySystem.get(s.systemId) ?? null,
-          highlighted: s.id === highlightedSystemId,
+          highlighted: litSystems.has(s.id),
         },
       })),
-    [data.systems, presenceBySystem, highlightedSystemId],
+    [data.systems, presenceBySystem, litSystems],
   );
 
   const edges = useMemo<Edge<PublicConnectionEdgeData>[]>(
@@ -62,9 +103,17 @@ export function SpectatorMap({
         type: 'connection',
         source: c.source,
         target: c.target,
-        data: c,
+        data: {
+          ...c,
+          endpointSecurity: {
+            source: securityBySystem.get(c.source) ?? null,
+            target: securityBySystem.get(c.target) ?? null,
+          },
+          highlighted: litConnections.has(c.id),
+          onHoverChange: setHoveredConnectionId,
+        },
       })),
-    [data.connections],
+    [data.connections, securityBySystem, litConnections],
   );
 
   return (
@@ -84,13 +133,18 @@ export function SpectatorMap({
           connectionMode={ConnectionMode.Loose}
           fitView
           fitViewOptions={FIT_VIEW_OPTIONS}
+          minZoom={MIN_ZOOM}
+          onPaneClick={onPaneClick}
           colorMode="dark"
-          preventScrolling={false}
           proOptions={{ hideAttribution: true }}
           aria-label={`${data.map.name} chain, ${data.systems.length} systems`}
         >
           <Background />
-          <Controls showInteractive={false} />
+          <Controls
+            showInteractive={false}
+            position="bottom-right"
+            fitViewOptions={FIT_VIEW_OPTIONS}
+          />
         </ReactFlow>
       </Tooltip.Provider>
     </ReactFlowProvider>
