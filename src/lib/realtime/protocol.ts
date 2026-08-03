@@ -91,11 +91,16 @@ export const subscribeLoadSchema = z.object({
 
 export const unsubscribeLoadSchema = subscribeLoadSchema;
 
-/** Liveness probe. Client sends `{ ts }`; server echoes it back with status. */
+/**
+ * Liveness probe. Client sends `{ ts }`; server echoes it back with status.
+ * `build` is the serving process's build id — a client that sees it change has
+ * reconnected to a different deployment and is running stale code.
+ */
 export const healthCheckLoadSchema = z.object({
   ts: z.number(),
   ok: z.boolean().optional(),
   listeners: z.number().int().nonnegative().optional(),
+  build: z.string().optional(),
 });
 
 export const mapDeletedLoadSchema = z.object({

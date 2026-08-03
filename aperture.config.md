@@ -31,6 +31,7 @@ A frozen `as const` object exposed as a named export. Grouped by concern:
 - `KILLMAIL_CACHE_RETENTION_DAYS` (30), `KILLMAIL_CLEANUP_CRON` — retention window and daily sweep cadence for the `universe_killmail` cache reaper (`killmail-cleanup`).
 
 **Realtime / WebSocket**
+- `APP_UPDATE_IDLE_RELOAD_MS` — how long a tab must stay continuously hidden, with a newer build deployed, before it reloads itself in the background. A visible tab is never reloaded from under the pilot; it gets a banner instead.
 - `MAP_EVENT_NOTIFY_CHANNEL_PREFIX` — `pg_notify` channel prefix for `ap_map_event` fanout.
 - `WS_PATH` — WebSocket upgrade path on the same Next.js deployment.
 - `WS_HEARTBEAT_MS`, `WS_RECONNECT_BASE_MS`, `WS_RECONNECT_MAX_MS`, `WS_HEALTH_STALE_MS` — heartbeat, client reconnect backoff, and the staleness threshold that flips the degraded-mode banner.

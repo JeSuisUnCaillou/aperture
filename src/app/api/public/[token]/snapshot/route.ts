@@ -1,5 +1,6 @@
 import 'server-only';
 import { type NextRequest } from 'next/server';
+import { getBuildId } from '@/lib/buildId';
 import { clientKeyFromForwardedFor } from '@/lib/http/clientKey';
 import { allowPublicSnapshotRequest, getPublicSnapshot } from '@/lib/map/publicSnapshot';
 import { withApiMetrics } from '@/lib/metrics/httpInstrumentation';
@@ -52,6 +53,9 @@ export const GET = withApiMetrics(
       );
     }
 
-    return Response.json({ ok: true, data }, { headers: PUBLIC_HEADERS });
+    // `build` rides the envelope rather than the projection: it is a property
+    // of the serving process, and the projection is what the per-token
+    // snapshot cache holds.
+    return Response.json({ ok: true, data, build: getBuildId() }, { headers: PUBLIC_HEADERS });
   },
 );

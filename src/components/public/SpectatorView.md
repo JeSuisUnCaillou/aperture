@@ -9,9 +9,10 @@
 |---|---|---|---|
 | token | string | yes | The share token, passed to `usePublicSnapshot` to open the public socket and refetch. |
 | initialData | PublicMapViewData | yes | The server-rendered redacted snapshot `usePublicSnapshot` seeds its state with. |
+| build | string | yes | Build id of the process that rendered the page, the baseline `useAppUpdate` compares each snapshot's reported build against. |
 
 ### Renders
-A full-height column: `PromoBar`, then a split body, then a status-strip footer. Below `lg` the split stacks with the entrances board beneath the map, capped at two fifths of the split's height so the chain keeps the other three; at `lg` and up the board becomes a fixed-width left rail. The footer leads with a feed indicator (a dot plus `LIVE`/`DELAYED`/`ENDED` and "updated Ns ago"), then counts systems, connections, and (when the token publishes a roster) pilots, with a `Read-only public view` marker pinned right.
+A full-height column: an update strip (only once a newer build is deployed), `PromoBar`, then a split body, then a status-strip footer. Below `lg` the split stacks with the entrances board beneath the map, capped at two fifths of the split's height so the chain keeps the other three; at `lg` and up the board becomes a fixed-width left rail. The footer leads with a feed indicator (a dot plus `LIVE`/`DELAYED`/`ENDED` and "updated Ns ago"), then counts systems, connections, and (when the token publishes a roster) pilots, with a `Read-only public view` marker pinned right.
 
 An empty map renders `Nothing is mapped here yet.` in place of the canvas; once the feed ends, the canvas region instead renders a short "this share link has ended" panel and the `IntroCard` is hidden. The board, bar and footer stay in both cases.
 
@@ -24,7 +25,8 @@ An empty map renders `Nothing is mapped here yet.` in place of the canvas; once 
 
 ### Depends On
 - `PromoBar`, `EntrancesBoard`, `SpectatorMap`, `IntroCard`
-- `usePublicSnapshot` (`./usePublicSnapshot`) — data, feed status, and last-update time
+- `usePublicSnapshot` (`./usePublicSnapshot`) — data, feed status, last-update time, and the served build id
+- `useAppUpdate` (`@/lib/appUpdate`) — flips the update strip on when the served build leaves the loaded one behind
 - Type `PublicMapViewData` from `@/types`
 
 ### Local State

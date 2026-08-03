@@ -23,10 +23,12 @@ export type PublicFeedStatus = 'live' | 'polling' | 'ended';
 export function usePublicSnapshot(
   token: string,
   initial: PublicMapViewData,
-): { data: PublicMapViewData; status: PublicFeedStatus; updatedAt: number } {
+  initialBuild: string,
+): { data: PublicMapViewData; status: PublicFeedStatus; updatedAt: number; build: string } {
   const [data, setData] = useState(initial);
   const [status, setStatus] = useState<PublicFeedStatus>('live');
   const [updatedAt, setUpdatedAt] = useState(() => Date.now());
+  const [build, setBuild] = useState(initialBuild);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,10 +66,12 @@ export function usePublicSnapshot(
       const json = (await res.json().catch(() => null)) as {
         ok: boolean;
         data?: PublicMapViewData;
+        build?: string;
       } | null;
       if (!json?.ok || !json.data) return;
       setData(json.data);
       setUpdatedAt(Date.now());
+      if (json.build) setBuild(json.build);
     }
 
     function scheduleRefetch(delayMs: number): void {
@@ -157,5 +161,5 @@ export function usePublicSnapshot(
     // without a full navigation, and `initial` only seeds the initial state.
   }, [token]);
 
-  return { data, status, updatedAt };
+  return { data, status, updatedAt, build };
 }

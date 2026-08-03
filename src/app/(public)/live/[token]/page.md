@@ -10,7 +10,7 @@
 | params | Promise<{ token: string }> | yes | Share token from the URL |
 
 ### Renders
-`SpectatorView`, handed the token and the redacted snapshot as its initial data. The page itself derives nothing — it resolves the token, 404s or renders.
+`SpectatorView`, handed the token, the redacted snapshot as its initial data, and the serving process's build id. The page itself derives nothing — it resolves the token, 404s or renders.
 
 ### Behaviour & Interactions
 - A token that does not resolve (unknown, expired, revoked, soft-deleted parent map) calls `notFound()`, so all four cases render the same 404 without distinguishing which.
@@ -20,3 +20,4 @@
 ### Depends On
 - `getPublicSnapshot` (`src/lib/map/publicSnapshot.ts`) — the cached, redacted projection.
 - `SpectatorView` (`src/components/public/SpectatorView.tsx`).
+- `getBuildId` (`src/lib/buildId.ts`).

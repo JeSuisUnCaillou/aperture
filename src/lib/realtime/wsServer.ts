@@ -5,6 +5,7 @@ import { decode } from 'next-auth/jwt';
 import { env } from '@/lib/env';
 import { apertureConfig } from '../../../aperture.config';
 import { canViewMap } from '@/lib/auth/rights';
+import { getBuildId } from '@/lib/buildId';
 import { clientKeyFromForwardedFor } from '@/lib/http/clientKey';
 import { seedTrackingForMap } from '@/lib/jobs/tracking';
 import { getLogger } from '@/lib/log/logger';
@@ -274,6 +275,9 @@ export function attachWsServer(httpServer: HttpServer): WebSocketServer {
     };
     clients.set(ws, state);
     incWsConnection();
+    // The build id rides the heartbeat, but a client that just reconnected
+    // through a deploy must not wait a full WS_HEARTBEAT_MS to learn it changed.
+    send(ws, { task: 'healthCheck', load: { ts: Date.now(), ok: true, build: getBuildId() } });
     void openPresenceSession(BigInt(session.characterId)).then((id) => {
       state.presenceSessionId = id;
     });
@@ -361,7 +365,7 @@ export function attachWsServer(httpServer: HttpServer): WebSocketServer {
       }
       state.isAlive = false;
       ws.ping();
-      send(ws, { task: 'healthCheck', load: { ts: Date.now(), ok: true } });
+      send(ws, { task: 'healthCheck', load: { ts: Date.now(), ok: true, build: getBuildId() } });
       if (state.presenceSessionId !== null) livePresenceIds.push(state.presenceSessionId);
     }
     for (const [ws, state] of publicClients) {

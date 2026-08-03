@@ -6,7 +6,7 @@
 ### GET
 No session, no cookie, no `mapId`: the token alone selects the map, so a client cannot steer the response at another map.
 
-**Response:** `{ ok: true, data: PublicMapViewData }` — the output of `getPublicSnapshot(token)` (`src/lib/map/publicSnapshot.ts`), which is the cached, viewer-independent projection.
+**Response:** `{ ok: true, data: PublicMapViewData, build: string }` — `data` is the output of `getPublicSnapshot(token)` (`src/lib/map/publicSnapshot.ts`), the cached viewer-independent projection; `build` is the serving process's build id, which sits on the envelope rather than inside the cached projection and is how a spectator tab notices it is running code from a superseded deploy.
 
 **Responses:** 200 ok, 429 rate-limited, 404 unknown / expired / revoked token. All three token failures answer the same bare 404, so the response never distinguishes "no such token" from "that one was revoked".
 
@@ -15,4 +15,5 @@ The rate limit is checked before the token is resolved, so guessing costs the gu
 ### Depends On
 - `getPublicSnapshot`, `allowPublicSnapshotRequest` (`src/lib/map/publicSnapshot.ts`).
 - `clientKeyFromForwardedFor` (`src/lib/http/clientKey.ts`).
+- `getBuildId` (`src/lib/buildId.ts`).
 - `withApiMetrics` (`src/lib/metrics/httpInstrumentation.ts`) — route label `/api/public/:token/snapshot`.

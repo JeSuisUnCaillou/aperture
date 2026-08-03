@@ -14,6 +14,7 @@ import { AppFooter } from '@/components/chrome/AppFooter';
 import { RealtimeProvider } from '@/lib/realtime/useRealtime';
 import { CurrentMapScopeProvider } from '@/components/chrome/CurrentMapScopeContext';
 import { RealtimeStatusBanner } from '@/components/RealtimeStatusBanner';
+import { AppUpdateBanner } from '@/components/AppUpdateBanner';
 import { LowContrastController } from '@/components/LowContrastController';
 import { ClientErrorReporter } from '@/components/ClientErrorReporter';
 import { ClientErrorBoundary } from '@/components/ClientErrorBoundary';
@@ -34,6 +35,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <ClientErrorReporter />
         <div className="flex min-h-screen flex-col">
           <RealtimeStatusBanner />
+          <AppUpdateBanner />
           <AppHeader
             active={{ id: active.id.toString(), name: active.name }}
             characters={characters}

@@ -27,6 +27,8 @@ Wires two `noServer` `ws` servers onto the HTTP server's `upgrade` event, routed
 
 **Heartbeat (shared):** every `WS_HEARTBEAT_MS` the server `ping`s every socket, session and public alike, terminating any that missed the prior pong. Session sockets additionally get an app-level `healthCheck` envelope (clears the degraded banner on a quiet map) and are batched into one `touchPresenceSessions` call; public sockets get neither — they have no degraded banner and no app-level vocabulary beyond `publicUpdate`.
 
+**Build id:** every `healthCheck` carries `build` (`getBuildId()`), and one is sent immediately on session connect so a client that reconnected through a deploy learns the new build without waiting a heartbeat interval.
+
 ---
 
 ### isWsServerAttached(): boolean
@@ -37,4 +39,4 @@ Whether `attachWsServer` has run in this process.
 - No `import 'server-only'`: loaded by the custom `server.ts` outside Next's bundler (the `server-only` shim doesn't resolve there); only `server.ts` and tests import it.
 
 ### Depends On
-- `ws`, `next-auth/jwt` (`decode`), `@/lib/auth/rights` (`canViewMap`), `@/lib/http/clientKey` (`clientKeyFromForwardedFor`), `@/lib/jobs/tracking` (`seedTrackingForMap`), `@/lib/log/logger` (`getLogger('server')` — per-frame `debug` trace), `@/lib/map/share` (`resolveShareToken`), `@/lib/metrics/registry` (`recordPublicWsUpgrade`), `./bus`, `./mapViewers` (`addMapViewer`/`removeMapViewer`), `./presenceSessions` (`openPresenceSession`/`touchPresenceSessions`), `./publicSockets` (`allowPublicUpgrade`/`registerPublicSocket`/`publicSocketCount`), `./wsConnections` (`incWsConnection`/`decWsConnection`), `./protocol`, `aperture.config`, `@/lib/env`, `@/types` (`ShareRedactionProfile`).
+- `ws`, `next-auth/jwt` (`decode`), `@/lib/auth/rights` (`canViewMap`), `@/lib/buildId` (`getBuildId`), `@/lib/http/clientKey` (`clientKeyFromForwardedFor`), `@/lib/jobs/tracking` (`seedTrackingForMap`), `@/lib/log/logger` (`getLogger('server')` — per-frame `debug` trace), `@/lib/map/share` (`resolveShareToken`), `@/lib/metrics/registry` (`recordPublicWsUpgrade`), `./bus`, `./mapViewers` (`addMapViewer`/`removeMapViewer`), `./presenceSessions` (`openPresenceSession`/`touchPresenceSessions`), `./publicSockets` (`allowPublicUpgrade`/`registerPublicSocket`/`publicSocketCount`), `./wsConnections` (`incWsConnection`/`decWsConnection`), `./protocol`, `aperture.config`, `@/lib/env`, `@/types` (`ShareRedactionProfile`).

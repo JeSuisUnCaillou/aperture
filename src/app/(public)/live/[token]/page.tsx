@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { SpectatorView } from '@/components/public/SpectatorView';
+import { getBuildId } from '@/lib/buildId';
 import { getPublicSnapshot } from '@/lib/map/publicSnapshot';
 
 /**
@@ -44,5 +45,5 @@ export default async function PublicMapPage({ params }: { params: Promise<{ toke
   const data = await getPublicSnapshot(token);
   if (!data) notFound();
 
-  return <SpectatorView token={token} initialData={data} />;
+  return <SpectatorView token={token} initialData={data} build={getBuildId()} />;
 }

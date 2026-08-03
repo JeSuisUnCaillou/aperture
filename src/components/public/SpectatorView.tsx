@@ -6,6 +6,7 @@ import { IntroCard } from './IntroCard';
 import { PromoBar } from './PromoBar';
 import { SpectatorMap, type SpectatorHighlight } from './SpectatorMap';
 import { usePublicSnapshot, type PublicFeedStatus } from './usePublicSnapshot';
+import { useAppUpdate } from '@/lib/appUpdate';
 import type { PublicMapEntrance, PublicMapViewData } from '@/types';
 
 // The spectator shell: promo bar, entrances board, chain, status strip. Built
@@ -18,16 +19,23 @@ const NO_HIGHLIGHT: SpectatorHighlight = { systemIds: [], connectionIds: [] };
 export function SpectatorView({
   token,
   initialData,
+  build,
 }: {
   token: string;
   initialData: PublicMapViewData;
+  build: string;
 }) {
   // Rows are identified by connection id, not held as objects, so a refetch
   // that drops or rewrites an entrance clears the highlight rather than
   // lighting a stale route.
   const [hoveredEntranceId, setHoveredEntranceId] = useState<string | null>(null);
   const [pinnedEntranceId, setPinnedEntranceId] = useState<string | null>(null);
-  const { data, status, updatedAt } = usePublicSnapshot(token, initialData);
+  const { data, status, updatedAt, build: servedBuild } = usePublicSnapshot(
+    token,
+    initialData,
+    build,
+  );
+  const updateAvailable = useAppUpdate(servedBuild);
   const pilotCount = countPilots(data.presence);
 
   // Hover wins over a pin, so pointing at a second row previews it without
@@ -45,6 +53,22 @@ export function SpectatorView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-spec-field text-spec-text">
+      {updateAvailable && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex shrink-0 items-center justify-center gap-3 border-b border-spec-line bg-spec-rail px-5 py-2 font-spec-mono text-[13px] text-spec-dim"
+        >
+          <span>A new version of Aperture is available.</span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded border border-spec-line px-2 py-0.5 text-spec-text hover:bg-spec-field"
+          >
+            Reload
+          </button>
+        </div>
+      )}
       <PromoBar mapName={data.map.name} shareLabel={data.map.shareLabel} />
 
       <div className="flex min-h-0 flex-1 flex-col-reverse lg:flex-row">

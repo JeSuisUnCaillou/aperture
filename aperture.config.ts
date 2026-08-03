@@ -106,6 +106,17 @@ export const apertureConfig = {
    */
   ESI_COMPATIBILITY_DATE: '2026-06-09',
 
+  /**
+   * How long a tab must stay continuously hidden, with a new build already
+   * deployed, before it reloads itself in the background. Reloading a visible
+   * tab would discard whatever the pilot is mid-way through typing, and this
+   * app is alt-tabbed away from constantly — so the dwell has to be long
+   * enough that anything unsaved is genuinely abandoned. A tab the pilot is
+   * actually looking at is never reloaded from under them; it gets the banner
+   * and its Reload button.
+   */
+  APP_UPDATE_IDLE_RELOAD_MS: 15 * 60 * 1000,
+
   /** `pg_notify` channel prefix for `ap_map_event` fanout. */
   MAP_EVENT_NOTIFY_CHANNEL_PREFIX: 'map:',
 
