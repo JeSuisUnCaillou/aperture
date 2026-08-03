@@ -229,7 +229,13 @@ export async function loadPresenceBuckets(input: {
   for (const [characterId, buckets] of byCharacter) {
     const converted = new Map<string, IntegrationOnlineSummary>();
     for (const [key, summary] of buckets) {
-      converted.set(key, { ...summary, lastSeenAt: summary.lastSeenAt.toISOString() });
+      // Rounded once on the accumulated total, not per clipped interval, so a
+      // bucket stitched from several sessions can't drift from its true span.
+      converted.set(key, {
+        ...summary,
+        seconds: Math.round(summary.seconds),
+        lastSeenAt: summary.lastSeenAt.toISOString(),
+      });
     }
     result.set(characterId, converted);
   }

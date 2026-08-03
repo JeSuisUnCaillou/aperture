@@ -31,3 +31,4 @@ Loads the same overlapping sessions clipped into `daily`/`weekly` buckets, reusi
 - A session spanning a bucket boundary contributes to every bucket it touches, clipped (`GREATEST`/`LEAST`-equivalent) to that bucket's span.
 - Returned as `Map<characterId.toString(), Map<bucketStartISO, IntegrationOnlineSummary>>` so callers can merge by the same keys they already group activity buckets by.
 - `lastSeenAt` is the max clipped `endedAt` touching that bucket — a real instant, not a synthetic UTC-midnight placeholder.
+- `seconds` is a whole number: presence bounds are millisecond-precision, and the per-bucket total is rounded once after accumulating every session that touches it.

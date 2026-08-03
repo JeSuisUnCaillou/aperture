@@ -6,6 +6,7 @@ import {
   mapNoteSeverity,
   mapScope,
   mapType,
+  sharePresenceMode,
   signatureActivity,
   signatureClassKind,
   signatureGroupKey,
@@ -27,7 +28,15 @@ import type { ShipClass } from '@/types';
  *
  * Authorization is session-based (Auth.js). `subscribe` only names the map
  * channels the client wants; the server independently checks the session has
- * access. There is no token handshake on the wire.
+ * access.
+ *
+ * A second, structurally separate upgrade path (`WS_PUBLIC_PATH`) authenticates
+ * anonymous spectator sockets via a share token in the query string and pins
+ * each socket to exactly one map (`resolveShareToken`). Those sockets never
+ * send a client→server frame and receive only `publicUpdate` — a coarse,
+ * data-free nudge. `publicUpdate`'s load cannot carry map data by
+ * construction, which is what keeps `loadPublicMapView` the only code path
+ * that emits public map data.
  *
  * Fidelity: the envelope and control-plane messages are pinned here. The
  * data-bearing bodies (mapUpdate/characterUpdate/etc.) are derived from
@@ -50,6 +59,7 @@ export const SERVER_TO_CLIENT_TASKS = [
   'logData',
   'systemNotification',
   'connectionMassLog',
+  'publicUpdate',
 ] as const;
 
 export const CLIENT_TO_SERVER_TASKS = ['subscribe', 'unsubscribe'] as const;
@@ -81,11 +91,16 @@ export const subscribeLoadSchema = z.object({
 
 export const unsubscribeLoadSchema = subscribeLoadSchema;
 
-/** Liveness probe. Client sends `{ ts }`; server echoes it back with status. */
+/**
+ * Liveness probe. Client sends `{ ts }`; server echoes it back with status.
+ * `build` is the serving process's build id — a client that sees it change has
+ * reconnected to a different deployment and is running stale code.
+ */
 export const healthCheckLoadSchema = z.object({
   ts: z.number(),
   ok: z.boolean().optional(),
   listeners: z.number().int().nonnegative().optional(),
+  build: z.string().optional(),
 });
 
 export const mapDeletedLoadSchema = z.object({
@@ -101,6 +116,18 @@ export type CharacterLogoutLoad = z.infer<typeof characterLogoutLoadSchema>;
 export const mapAccessLoadSchema = z.object({
   mapId: z.number().int().positive(),
   characterIds: z.array(z.number().int().positive()),
+});
+
+/**
+ * `publicUpdate` load. Sent only to token-pinned public sockets
+ * (`src/lib/realtime/wsServer.ts`'s public upgrade branch) as a coarse
+ * "something changed" nudge — no `mapId`, no `kind`, no `data`. The client
+ * refetches the redacted, cached snapshot rather than trusting anything on
+ * the wire; `ts` is the server clock at nudge time, informational only (not a
+ * cursor).
+ */
+export const publicUpdateLoadSchema = z.object({
+  ts: z.number(),
 });
 
 // ---------------------------------------------------------------------------
@@ -415,14 +442,37 @@ export const mapEventPayloadSchema = z.discriminatedUnion('kind', [
     roleName: z.string(),
     capability: delegatableCapabilityEnum,
   }),
+  // A public share link (`/live/<token>`) is minted or killed. The token
+  // itself never rides the payload — this envelope reaches every viewer and
+  // the Discord history webhook, and the token is a capability URL. The label
+  // and redaction profile do ride it, so the audit line names what was
+  // published without a share lookup, and the in-map indicator can flip from
+  // the event alone.
+  z.object({
+    kind: z.literal('share.created'),
+    eventId,
+    shareId: z.string(),
+    label: z.string(),
+    presenceMode: z.enum(sharePresenceMode.enumValues),
+    showSignatures: z.boolean(),
+    showConnectionSigIds: z.boolean(),
+    expiresAt: z.string().nullable(),
+  }),
+  z.object({
+    kind: z.literal('share.revoked'),
+    eventId,
+    shareId: z.string(),
+    label: z.string(),
+  }),
 ]);
 
 export type MapEventPayload = z.infer<typeof mapEventPayloadSchema>;
 
 /**
- * Seeded `ap_event_kind` values (migrations 0004 + 0014 + 0057). The discriminator
- * set. Includes `map.restore`/`map.purge` for the admin maps panel and
- * `access.granted`/`access.revoked` for per-title feature delegation.
+ * Seeded `ap_event_kind` values (migrations 0004 + 0014 + 0057 + 0061). The
+ * discriminator set. Includes `map.restore`/`map.purge` for the admin maps
+ * panel, `access.granted`/`access.revoked` for per-title feature delegation,
+ * and `share.created`/`share.revoked` for public share links.
  */
 export const MAP_EVENT_KINDS = [
   'system.added',
@@ -444,6 +494,8 @@ export const MAP_EVENT_KINDS = [
   'map.purge',
   'access.granted',
   'access.revoked',
+  'share.created',
+  'share.revoked',
 ] as const;
 
 export type MapEventKind = (typeof MAP_EVENT_KINDS)[number];
@@ -616,6 +668,7 @@ export const serverToClientMessageSchema = z.discriminatedUnion('task', [
   message('logData', logDataLoadSchema),
   message('systemNotification', systemNotificationLoadSchema),
   message('connectionMassLog', connectionMassLogLoadSchema),
+  message('publicUpdate', publicUpdateLoadSchema),
 ]);
 
 export const clientToServerMessageSchema = z.discriminatedUnion('task', [

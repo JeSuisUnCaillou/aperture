@@ -200,6 +200,7 @@ describe.skipIf(!run)('map API routes — signature mutations + broadcast (real 
         wormholeCode: null,
         name: 'Renamed Sig',
         description: 'gas site',
+        eolStage: 'none',
         expiresAt: expect.any(String),
         createdAt: expect.any(String),
         updatedAt: expect.any(String),

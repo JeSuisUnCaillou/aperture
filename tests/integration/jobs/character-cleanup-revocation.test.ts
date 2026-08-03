@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { JobHelpers } from 'graphile-worker';
 import { db, pool } from '@/db/client';
 import {
@@ -48,6 +48,50 @@ function makeHelpers(): JobHelpers {
   return { addJob: vi.fn(async () => ({}) as never) } as unknown as JobHelpers;
 }
 
+/**
+ * The affiliation sweep scans every active token-holding character in the DB,
+ * not just this test's. Echo each other row's stored corp/alliance straight back
+ * so they count as unchanged and are never synced, leaving `affiliationChanged`
+ * a function of CHAR_ID alone.
+ */
+async function affiliationsFor(ids: number[], charCorp: bigint) {
+  const rows = await db
+    .select({
+      id: apCharacter.id,
+      corporationId: apCharacter.corporationId,
+      allianceId: apCharacter.allianceId,
+    })
+    .from(apCharacter)
+    .where(inArray(apCharacter.id, ids.map(BigInt)));
+
+  return rows.map((r) =>
+    r.id === CHAR_ID
+      ? { character_id: Number(r.id), corporation_id: Number(charCorp) }
+      : {
+          character_id: Number(r.id),
+          corporation_id: Number(r.corporationId ?? CORP_A),
+          ...(r.allianceId !== null ? { alliance_id: Number(r.allianceId) } : {}),
+        },
+  );
+}
+
+/**
+ * `esiCall` stub for the whole sweep. Only CHAR_ID's affiliation moves; the
+ * public profile is read for `name` only.
+ */
+function mockEsi(charCorp: bigint) {
+  mockedEsiCall.mockImplementation(async (opKey, opts) => {
+    if (opKey === 'getCharacterAffiliation') {
+      return (await affiliationsFor((opts as { body: number[] }).body, charCorp)) as never;
+    }
+    if (opKey === 'getCharacterRoles') return { roles: [] } as never;
+    if (opKey === 'getCharacterTitles') return [] as never;
+    if (opKey === 'getCharacter')
+      return { name: 'Revocation Test', corporation_id: Number(charCorp) } as never;
+    throw new Error(`unexpected opKey ${opKey}`);
+  });
+}
+
 async function lastRun() {
   const [row] = await db
     .select()
@@ -79,6 +123,21 @@ describe.skipIf(!run)('character-cleanup affiliation revocation (real Postgres)'
       .insert(apCorporation)
       .values({ id: CORP_A, name: 'Corp A', lastSyncedAt: new Date() })
       .onConflictDoNothing();
+
+    // The private map's owner_character_id FKs to ap_character, so the row has
+    // to exist before the map is inserted. beforeEach re-upserts it per test.
+    await db.insert(apCharacter).values({
+      id: CHAR_ID,
+      userId,
+      name: 'Revocation Test',
+      ownerHash: 'oh-rev',
+      corporationId: CORP_A,
+      allianceId: null,
+      esiRefreshToken: 'encrypted-placeholder',
+      status: 'active',
+      authzLevel: 'member',
+      authzSyncedAt: new Date(),
+    });
 
     const [corpMap] = await db
       .insert(apMap)
@@ -159,16 +218,7 @@ describe.skipIf(!run)('character-cleanup affiliation revocation (real Postgres)'
   });
 
   it('refreshes corp, prunes tracking on the lost corp map, keeps the private map', async () => {
-    mockedEsiCall.mockImplementation(async (opKey, opts) => {
-      if (opKey === 'getCharacterAffiliation') {
-        // ESI now reports the character in CORP_B (they left CORP_A).
-        const body = (opts as { body: number[] }).body;
-        return body.map((id) => ({ character_id: id, corporation_id: Number(CORP_B) })) as never;
-      }
-      if (opKey === 'getCharacterRoles') return { roles: [] } as never;
-      if (opKey === 'getCharacterTitles') return [] as never;
-      throw new Error(`unexpected opKey ${opKey}`);
-    });
+    mockEsi(CORP_B); // ESI now reports the character in CORP_B (they left CORP_A)
 
     await characterCleanup.run(undefined, makeHelpers());
 
@@ -206,15 +256,7 @@ describe.skipIf(!run)('character-cleanup affiliation revocation (real Postgres)'
   });
 
   it('leaves tracking intact when the corp is unchanged', async () => {
-    mockedEsiCall.mockImplementation(async (opKey, opts) => {
-      if (opKey === 'getCharacterAffiliation') {
-        const body = (opts as { body: number[] }).body;
-        return body.map((id) => ({ character_id: id, corporation_id: Number(CORP_A) })) as never;
-      }
-      if (opKey === 'getCharacterRoles') return { roles: [] } as never;
-      if (opKey === 'getCharacterTitles') return [] as never;
-      throw new Error(`unexpected opKey ${opKey}`);
-    });
+    mockEsi(CORP_A);
 
     await characterCleanup.run(undefined, makeHelpers());
 
@@ -228,15 +270,7 @@ describe.skipIf(!run)('character-cleanup affiliation revocation (real Postgres)'
   });
 
   it('broadcasts a characterLogout on the revoked map', async () => {
-    mockedEsiCall.mockImplementation(async (opKey, opts) => {
-      if (opKey === 'getCharacterAffiliation') {
-        const body = (opts as { body: number[] }).body;
-        return body.map((id) => ({ character_id: id, corporation_id: Number(CORP_B) })) as never;
-      }
-      if (opKey === 'getCharacterRoles') return { roles: [] } as never;
-      if (opKey === 'getCharacterTitles') return [] as never;
-      throw new Error(`unexpected opKey ${opKey}`);
-    });
+    mockEsi(CORP_B);
 
     const received: ServerToClientMessage[] = [];
     const unsubscribe = bus.subscribe(corpMapId, (msg) => received.push(msg));

@@ -18,6 +18,7 @@ import type {
   apMapEvent,
   apMapNote,
   apMapRoleAccess,
+  apMapShare,
   apMapSignature,
   apMapSystem,
   apMapTrackingSeed,
@@ -57,6 +58,7 @@ import type {
   mapType,
   roleSource,
   routeSafety,
+  sharePresenceMode,
   signatureGroupKey,
   structureEventKind,
   tagScheme,
@@ -201,6 +203,9 @@ export type NewApCharacterRole = InferInsertModel<typeof apCharacterRole>;
 export type ApMapRoleAccess = InferSelectModel<typeof apMapRoleAccess>;
 export type NewApMapRoleAccess = InferInsertModel<typeof apMapRoleAccess>;
 
+export type ApMapShare = InferSelectModel<typeof apMapShare>;
+export type NewApMapShare = InferInsertModel<typeof apMapShare>;
+
 export type ApInstance = InferSelectModel<typeof apInstance>;
 export type NewApInstance = InferInsertModel<typeof apInstance>;
 
@@ -224,6 +229,7 @@ export type MapRight = (typeof mapRight.enumValues)[number];
 export type MapType = (typeof mapType.enumValues)[number];
 export type RoleSource = (typeof roleSource.enumValues)[number];
 export type RouteSafety = (typeof routeSafety.enumValues)[number];
+export type SharePresenceMode = (typeof sharePresenceMode.enumValues)[number];
 export type SignatureGroupKey = (typeof signatureGroupKey.enumValues)[number];
 export type StructureEventKind = (typeof structureEventKind.enumValues)[number];
 export type TagScheme = (typeof tagScheme.enumValues)[number];
@@ -236,6 +242,45 @@ export type AccessScope = (typeof accessScope.enumValues)[number];
 export type AccessCapability = (typeof accessCapability.enumValues)[number];
 export type ErrorLevel = (typeof errorLevel.enumValues)[number];
 export type ErrorSource = (typeof errorSource.enumValues)[number];
+/**
+ * The redaction flags a resolved share token carries, keyed off `ap_map_share`'s
+ * per-token columns. `loadPublicMapView` (Stage 2) branches on exactly this and
+ * nothing else to decide what a public viewer may see.
+ */
+export type ShareRedactionProfile = {
+  presenceMode: SharePresenceMode;
+  showSignatures: boolean;
+  showConnectionSigIds: boolean;
+};
+
+/**
+ * One share link as the management panel renders it. Carries the raw `token`
+ * so the panel can rebuild the `/live/<token>` URL for the copy button — this
+ * shape is only ever returned to a viewer holding `share_manage`. `expired` is
+ * resolved server-side against `now()` so the row's status does not depend on
+ * the client's clock.
+ */
+export type MapShareListItem = ShareRedactionProfile & {
+  id: string;
+  token: string;
+  label: string;
+  expiresAt: string | null;
+  expired: boolean;
+  createdAt: string;
+  createdByName: string | null;
+};
+
+/**
+ * The minimum a viewer needs to be told the map is being published: one entry
+ * per live share, no token. Everyone who can see the map gets these, not just
+ * managers — a live share is deliberately visible to the people it exposes.
+ */
+export type LiveShareBadge = {
+  id: string;
+  label: string;
+  expiresAt: string | null;
+};
+
 /** The six cosmic-signature groups (every group except `wormhole`). Their site
  * names are baked into the EVE client and have no SDE rows, so they're carried
  * as free-text `name` strings rather than a `typeId` FK. */
@@ -335,6 +380,18 @@ export type {
   MapSettings,
   AdminMapListItem,
 } from '@/lib/map/loadMap';
+
+// Redacted public-share view-model types (shaped in src/lib/map/loadPublicMap.ts).
+export type {
+  PublicMapSystemNode,
+  PublicMapConnectionEdge,
+  PublicMapSignature,
+  PublicPresenceSystemCount,
+  PublicPresencePilot,
+  PublicMapPresence,
+  PublicMapViewData,
+} from '@/lib/map/loadPublicMap';
+export type { PublicMapEntrance, PublicMapEntranceHop } from '@/lib/map/publicEntrances';
 
 // Per-title feature-delegation view-model (src/app/(app)/actions/mapRoles.ts).
 /** One corp title with the capabilities currently delegated to it on a map. `view` is implicit and never listed. */
@@ -725,6 +782,13 @@ export type WebhookOutcome =
   | 'http_5xx'
   | 'network_error';
 
+/**
+ * Outcome label for `public_ws_upgrades_total`, one per public spectator
+ * upgrade handshake. `at_cap` is the per-token connection ceiling, which the
+ * client reads as "degrade to polling" rather than as an error.
+ */
+export type PublicWsUpgradeOutcome = 'accepted' | 'rate_limited' | 'unauthorized' | 'at_cap';
+
 /** Outcome label for `esi_token_refresh_total` in the SSO refresh exchange. */
 export type TokenRefreshOutcome =
   | 'success'
@@ -771,6 +835,8 @@ export type GaugeReadings = {
   trackedCharacters: number;
   visibleSystems: number;
   wsConnections: number;
+  /** Live anonymous spectator sockets across every share token. */
+  publicWsConnections: number;
   openEsiBreakers: number;
   jobBacklog: number;
   jobsAbandoned: number;
