@@ -34,7 +34,7 @@ import type { MapCapability, MapEventPayload, MapSettings } from '@/types';
  * `share_manage`, Export ← `map_export`, Import ← `map_import` — all
  * re-checked server-side. The Roles & Permissions
  * tab (delegating features to titles) is manager-only (`canManage`). The audit
- * log lives in its own wider dialog (`MapAuditDialog`).
+ * log lives in its own dialog (`MapAuditDialog`).
  */
 export function MapSettingsDialog({
   open,
@@ -62,7 +62,7 @@ export function MapSettingsDialog({
   const can = (capability: MapCapability) => capabilities.includes(capability);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="flex max-h-[85vh] w-full max-w-4xl flex-col">
         <DialogHeader>
           <DialogTitle>Map settings</DialogTitle>
           <DialogDescription className="capitalize">
@@ -70,7 +70,7 @@ export function MapSettingsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="general">
+        <Tabs defaultValue="general" className="min-h-0 flex-1">
           <TabsList>
             <TabsTab value="general">General</TabsTab>
             <TabsTab value="settings">Settings</TabsTab>
@@ -83,61 +83,63 @@ export function MapSettingsDialog({
             {canManage && <TabsTab value="roles">Roles &amp; Permissions</TabsTab>}
           </TabsList>
 
-          <TabsPanel value="general">
-            <GeneralPanel mapId={mapId} settings={settings} />
-          </TabsPanel>
-          <TabsPanel value="settings">
-            <SettingsPanel />
-          </TabsPanel>
-          {can('settings_manage') && (
-            <TabsPanel value="behavior">
-              <MapBehaviorForm
-                mapId={mapId}
-                initialValues={{
-                  deleteExpiredConnections: settings.deleteExpiredConnections,
-                  deleteEolConnections: settings.deleteEolConnections,
-                  trackAbyssalJumps: settings.trackAbyssalJumps,
-                  logActivity: settings.logActivity,
-                }}
-              />
+          <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+            <TabsPanel value="general">
+              <GeneralPanel mapId={mapId} settings={settings} />
             </TabsPanel>
-          )}
-          {can('settings_manage') && (
-            <TabsPanel value="tagging">
-              <MapTaggingForm
-                mapId={mapId}
-                initialScheme={settings.tagScheme}
-                initialHomeMapSystemId={settings.homeMapSystemId}
-                initialExemptHomeStatic={settings.exemptHomeStaticFromTag}
-                systems={systems}
-              />
+            <TabsPanel value="settings">
+              <SettingsPanel />
             </TabsPanel>
-          )}
-          {can('webhooks_manage') && (
-            <TabsPanel value="webhooks">
-              <MapWebhooksPanel mapId={mapId} />
-            </TabsPanel>
-          )}
-          {can('share_manage') && (
-            <TabsPanel value="shares">
-              <MapSharePanel mapId={mapId} />
-            </TabsPanel>
-          )}
-          {can('map_export') && (
-            <TabsPanel value="export">
-              <ExportPanel mapId={mapId} mapName={settings.name} />
-            </TabsPanel>
-          )}
-          {can('map_import') && (
-            <TabsPanel value="import">
-              <ImportPanel mapId={mapId} onImported={onImported} />
-            </TabsPanel>
-          )}
-          {canManage && (
-            <TabsPanel value="roles">
-              <MapRolesForm mapId={mapId} />
-            </TabsPanel>
-          )}
+            {can('settings_manage') && (
+              <TabsPanel value="behavior">
+                <MapBehaviorForm
+                  mapId={mapId}
+                  initialValues={{
+                    deleteExpiredConnections: settings.deleteExpiredConnections,
+                    deleteEolConnections: settings.deleteEolConnections,
+                    trackAbyssalJumps: settings.trackAbyssalJumps,
+                    logActivity: settings.logActivity,
+                  }}
+                />
+              </TabsPanel>
+            )}
+            {can('settings_manage') && (
+              <TabsPanel value="tagging">
+                <MapTaggingForm
+                  mapId={mapId}
+                  initialScheme={settings.tagScheme}
+                  initialHomeMapSystemId={settings.homeMapSystemId}
+                  initialExemptHomeStatic={settings.exemptHomeStaticFromTag}
+                  systems={systems}
+                />
+              </TabsPanel>
+            )}
+            {can('webhooks_manage') && (
+              <TabsPanel value="webhooks">
+                <MapWebhooksPanel mapId={mapId} />
+              </TabsPanel>
+            )}
+            {can('share_manage') && (
+              <TabsPanel value="shares">
+                <MapSharePanel mapId={mapId} />
+              </TabsPanel>
+            )}
+            {can('map_export') && (
+              <TabsPanel value="export">
+                <ExportPanel mapId={mapId} mapName={settings.name} />
+              </TabsPanel>
+            )}
+            {can('map_import') && (
+              <TabsPanel value="import">
+                <ImportPanel mapId={mapId} onImported={onImported} />
+              </TabsPanel>
+            )}
+            {canManage && (
+              <TabsPanel value="roles">
+                <MapRolesForm mapId={mapId} />
+              </TabsPanel>
+            )}
+          </div>
         </Tabs>
       </DialogContent>
     </Dialog>
@@ -163,7 +165,7 @@ function SettingsPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex max-w-2xl flex-col gap-4">
       <p className="text-sm text-muted-foreground">
         These preferences are stored on this device only.
       </p>
@@ -228,7 +230,7 @@ function GeneralPanel({ mapId, settings }: { mapId: string; settings: MapSetting
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex max-w-lg flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="map-settings-name" className="text-sm font-medium">
           Name
@@ -296,7 +298,7 @@ function ExportPanel({ mapId, mapName }: { mapId: string; mapName: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex max-w-2xl flex-col gap-4">
       <p className="text-sm text-muted-foreground">
         Download “{mapName}” as a JSON file — its systems, connections, and signatures. Re-import it
         into another map to copy the chain.
@@ -345,7 +347,7 @@ function ImportPanel({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex max-w-2xl flex-col gap-4">
       <p className="text-sm text-muted-foreground">
         Choose a map-export JSON file. Its systems, connections, and signatures are{' '}
         <span className="font-medium text-foreground">merged into this map</span> (existing systems
