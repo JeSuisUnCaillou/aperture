@@ -11,6 +11,7 @@ const DOGMA_ATTRIBUTE = { 3974: { name: 'scanWormholeStrength', published: true 
 const TYPES = {
   3001: { groupID: 2, name: 'Test Ore', published: true },
   3002: { groupID: 988, name: 'Wormhole A001', published: false },
+  3003: { groupID: 988, name: 'QA Wormhole A', published: false },
 };
 const TYPE_DOGMA = { 3002: { dogmaAttributes: [{ attributeID: 3974, value: 5 }] } };
 const REGIONS = { 1000: { name: 'Test Region' } };
@@ -54,12 +55,13 @@ describe('parseSdeArchive', () => {
     expect(parsed.categories).toHaveLength(1);
     expect(parsed.groups).toHaveLength(1);
     expect(parsed.dogmaAttributes).toHaveLength(1);
-    expect(parsed.typeIds.size).toBe(2);
+    expect(parsed.typeIds.size).toBe(3);
     expect(parsed.typeAttributes).toEqual([{ typeId: 3002, attributeId: 3974, value: 5 }]);
     expect(parsed.regions).toHaveLength(1);
     expect(parsed.constellations).toHaveLength(1);
     expect(parsed.systemIds.size).toBe(2);
     expect(parsed.stargateEdges).toHaveLength(2);
+    // CCP's QA test hole (3003) is a group-988 type row but not a WH code.
     expect(parsed.wormholeCodeEntries).toEqual([{ code: 'A001', typeId: 3002 }]);
     expect(parsed.systemNameToId.get('Alpha')).toBe(30000001);
   });

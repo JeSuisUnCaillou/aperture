@@ -57,6 +57,8 @@ The SDE ships duplicate `Wormhole <CODE>` types under group `988` (e.g. two "Wor
 
 Since the WH catalog CSVs are hand-maintained (frozen anoik.is dataset) and self-refresh cannot invent new rows for them, `runIngest` records the gap instead: every group-988 code the ingested build carries with no matching `wormhole-classes.csv` row is collected into `ap_sde_state.uncataloged_wormhole_codes`, so `/setup` can surface "CCP added a hole type nobody has catalogued yet" after a refresh.
 
+Group 988 also carries CCP's unpublished QA test holes (`QA Wormhole A`/`B`, ids `32894`/`32895`), whose trailing token is a bare letter rather than a signature code. Code extraction skips any group-988 type whose name starts with `QA `, in both `parseSdeArchive` and `runCsvIngest`, so they neither enter the code→typeId map nor show up as uncatalogued.
+
 ---
 
 ### Vendored community data (anoik.is)

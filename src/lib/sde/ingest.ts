@@ -359,6 +359,17 @@ function buildWormholeCodeToTypeId(
   return map;
 }
 
+/**
+ * Trailing token of a group-988 type name, which is the WH signature code.
+ * CCP ships unpublished QA test holes ("QA Wormhole A"/"B") in that group whose
+ * trailing token is a bare letter, not a code — they have no catalog row and
+ * never will, so they are excluded rather than reported as uncatalogued.
+ */
+function wormholeCodeFromTypeName(name: string): string | null {
+  if (name.startsWith('QA ')) return null;
+  return name.split(' ').pop() || null;
+}
+
 function parseTypes(zip: AdmZip) {
   const data = decodeEntries('types.yaml', readYamlEntry(zip, 'types.yaml'), sdeTypeSchema);
   const typeIds = new Set<number>();
@@ -367,7 +378,7 @@ function parseTypes(zip: AdmZip) {
     typeIds.add(id);
     const name = en(t.name) ?? '';
     if (t.groupID === WORMHOLE_GROUP_ID) {
-      const code = name.split(' ').pop();
+      const code = wormholeCodeFromTypeName(name);
       if (code) wormholeCodeEntries.push({ code, typeId: id });
     }
     return {
@@ -1291,7 +1302,7 @@ export async function runCsvIngest(): Promise<IngestResult> {
   const wormholeCodeEntries: { code: string; typeId: number }[] = [];
   for (const r of typeRows) {
     if (r.groupId === WORMHOLE_GROUP_ID) {
-      const code = r.name?.split(' ').pop();
+      const code = wormholeCodeFromTypeName(r.name ?? '');
       if (code) wormholeCodeEntries.push({ code, typeId: r.id });
     }
   }
