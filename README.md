@@ -106,6 +106,35 @@ If you reach for `pnpm sde:bootstrap` instead and it fails saying the build is o
 the database holds, that is the downgrade gate doing its job: the refresh has already moved past
 the pinned build and no action is needed.
 
+#### EVE SSO application
+
+Register an application at [developers.eveonline.com](https://developers.eveonline.com) to get
+`AUTH_EVE_CLIENT_ID` / `AUTH_EVE_CLIENT_SECRET`. Pick the connection type that grants API
+scopes (Aperture is a confidential client and uses the secret), and set the callback URL to
+your deployment's origin plus `/api/auth/callback/eve`, e.g.
+`https://aperture.example.com/api/auth/callback/eve`. That origin must match `AUTH_URL`, which
+pins the canonical origin Auth.js builds redirects from.
+
+The scopes Aperture requests live in one place: the `ESI_SCOPES` array in
+[`aperture.config.ts`](aperture.config.ts), which
+[`src/lib/auth/eve-provider.ts`](src/lib/auth/eve-provider.ts) sends verbatim in the
+authorization request. Tick exactly these on the application:
+
+| Scope | Needed for |
+|---|---|
+| `publicData` | Baseline character identity. |
+| `esi-location.read_location.v1` | Server-side character tracking. |
+| `esi-location.read_ship_type.v1` | Current ship, and the derived connection mass log. |
+| `esi-location.read_online.v1` | Adaptive location-poll cadence (online vs offline). |
+| `esi-characters.read_corporation_roles.v1` | Director detection, which resolves to corp manager rights. |
+| `esi-characters.read_titles.v1` | Mirrors corp titles into `ap_role` so map access can be granted by title. |
+| `esi-search.search_structures.v1` | Corporation search in the structure-intel dialog. ESI gates *every* search category behind this one scope despite its name. |
+| `esi-ui.write_waypoint.v1` | The "Set destination" context-menu action. |
+
+Treat `ESI_SCOPES` as the authority and this table as the explanation. If an application is
+missing a scope Aperture asks for, EVE rejects the whole authorization request, so it surfaces
+as a failed login rather than one quietly broken feature.
+
 #### Required environment
 
 See [`.env.example`](.env.example) for the full list.
