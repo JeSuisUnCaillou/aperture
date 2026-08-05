@@ -20,6 +20,11 @@ dist/
 .env.*
 !.env.example
 
+# Host-local compose overrides (proxy networks, aliases). Compose merges this
+# into docker-compose.yml on a bare `up`, so each deployment host keeps its own
+# without the tracked file ever diverging.
+/docker-compose.override.yml
+
 # Editor / OS
 .idea/
 .vscode/
