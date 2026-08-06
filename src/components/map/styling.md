@@ -29,11 +29,17 @@ Returns the amber/gold accent (`#fbbf24`) used to mark the map's designated Home
 ### noteSeverityColor(severity: NoteSeverity): string
 Border colour for a map note (`MapNoteNode`), by `map_note_severity`: `neutral`→grey `#6b7280` (the file's default, so an unflagged note reads as "no severity"), `green`→`#22c55e`, `yellow`→`#eab308`, `red`→`#ef4444`.
 
-### connectionStyle(edge: MapConnectionEdge): EdgeStyle
+### connectionStyle(edge: Pick&lt;MapConnectionEdge, 'scope' | 'massStatus' | 'jumpMassClass' | 'eolStage'&gt;): EdgeStyle
 Returns `{ stroke, strokeWidth, strokeDasharray? }`. Scope sets the base colour; wormholes are recoloured by `massStatus` (fresh/reduced/critical). `eolStage` dashes the line — `expired` sparsest (`1 4`, barely-there), `critical` (1h) tighter (`2 3`) than `eol` (4h, `6 4`) — to read as progressively more urgent; `jumpMassClass === 's'` thins the stroke (frigate/small holes).
 
-### connectionBadges(edge: MapConnectionEdge): ConnectionBadge[]
+### connectionBadges(edge: Pick&lt;MapConnectionEdge, 'isStatic' | 'jumpMassClass' | 'eolStage'&gt;): ConnectionBadge[]
 Structured text badges for a connection: `STATIC` (user-designated static), jump-mass class (`S`/`M`/`L`/`XL`), then `EOL` (eol stage), `EOL 1h` (critical stage), or `EXPIRED` (manual expired stage). Each badge is `{ key, label, tone? }`. The small (`s`) size badge carries `tone: 'warn'` (filled amber pill — small holes are easy to miss) and the `EXPIRED` badge `tone: 'danger'` (filled red pill — do-not-jump hazard); `ConnectionEdge`/`SystemOverlay` colour the pill by tone. Rolling and preserve-mass are **not** returned here; `ConnectionEdge` renders them as standalone icons.
+
+### connectionBubbleColor(): string
+Returns the cold ice blue (`#9ec9f0`) used for a bubbled connection end — the `ConnectionBubble` ring and wash. Held apart from the mass/scope palette so a bubble never reads as connection state, and high enough in luminance to carry against the canvas at the low alphas the ring fill and wash use.
+
+### connectionEndpointColor(): string
+Returns the neutral slate (`#94a3b8`) used for the `ConnectionEndpoint` hover dot. Deliberately not the bubble hue: the dot marks where a control is, not what state the end is in, and the two share a spot.
 
 ### Notes
 - Kept out of Tailwind tokens because they're consumed inside SVG/inline styles.

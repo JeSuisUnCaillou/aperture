@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, getSmoothStepPath, type EdgeProps } from '@xyflow/react';
 import type { MapConnectionEdge } from '@/lib/map/loadMap';
+import type { ConnectionEnd } from '@/types';
 import { Tooltip } from '@base-ui/react/tooltip';
 import { RefreshCw, Shield, type LucideIcon } from 'lucide-react';
 import { connectionBadges, connectionStyle } from './styling';
 import { useTravelForConnection } from './MapTravelContext';
 import { ConnectionDetailPopover } from './ConnectionDetailPopover';
 import { useEdgeAnchors } from './useEdgeAnchors';
+import { ConnectionBubble } from './ConnectionBubble';
+import { ConnectionEndpoint, type ConnectionEndpointState } from './ConnectionEndpoint';
 
 // Selectable connection edge. Scope + mass status drive the stroke colour; EOL
 // dashes the line; flags (jump-mass / EOL / frigate / rolling / preserve) render
@@ -21,6 +24,16 @@ import { useEdgeAnchors } from './useEdgeAnchors';
 // enters from the sides closest to the other node rather than always running
 // bottom-to-top. Several connections leaving the same face fan out to their own
 // attachment point instead of converging on one pixel (`useEdgeAnchors`).
+//
+// Hovering the line reveals a small interactable dot at each end
+// (`ConnectionEndpoint`); right-clicking one opens the per-end context menu.
+// A flagged end additionally renders a `ConnectionBubble` (a translucent
+// circle plus a gradient wash fading out a short way along the line).
+//
+// The line and the two endpoints are competing right-click targets sharing the
+// same patch of canvas, so exactly one of the three is ever emphasised: an
+// endpoint under the pointer arms and the line drops its hover weight. Whatever
+// is lit is what the click will hit.
 
 export type ConnectionEdgeData = MapConnectionEdge & {
   /** Owning map id — feeds the detail popover's mass-log fetch. */
@@ -29,6 +42,8 @@ export type ConnectionEdgeData = MapConnectionEdge & {
   wormholeTypeId: number | null;
   /** Resolved source-wormhole code (e.g. "B274"); null when unknown. */
   wormholeCode: string | null;
+  /** Right-click on one mouth of this connection; opens the endpoint context menu. */
+  onEndpointContextMenu: (connectionId: string, end: ConnectionEnd, clientX: number, clientY: number) => void;
 };
 
 export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) {
@@ -55,6 +70,18 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
     targetY: anchors?.target.y ?? targetY,
     targetPosition: anchors?.target.position ?? targetPosition,
   };
+  const sourceAnchor = {
+    x: pathArgs.sourceX,
+    y: pathArgs.sourceY,
+    position: pathArgs.sourcePosition,
+    pitch: anchors?.source.pitch ?? 0,
+  };
+  const targetAnchor = {
+    x: pathArgs.targetX,
+    y: pathArgs.targetY,
+    position: pathArgs.targetPosition,
+    pitch: anchors?.target.pitch ?? 0,
+  };
   // Gate links render as right-angled (orthogonal) paths to read distinctly from
   // the smooth bezier of wormhole/jumpbridge/abyssal connections; `borderRadius:
   // 0` keeps the corners crisp.
@@ -62,15 +89,69 @@ export function ConnectionEdge(props: EdgeProps & { data: ConnectionEdgeData }) 
     data.scope === 'stargate'
       ? getSmoothStepPath({ ...pathArgs, borderRadius: 0 })
       : getBezierPath(pathArgs);
+  const [hovered, setHovered] = useState(false);
+  const [hoveredEnd, setHoveredEnd] = useState<ConnectionEnd | null>(null);
+
   const style = connectionStyle(data);
-  const finalStyle = selected ? { ...style, strokeWidth: (style.strokeWidth ?? 3) + 2 } : style;
+  const lineWeight = selected ? 2 : hovered && hoveredEnd === null ? 1.5 : 0;
+  const finalStyle = lineWeight
+    ? { ...style, strokeWidth: (style.strokeWidth ?? 3) + lineWeight }
+    : style;
   const badges = connectionBadges(data);
   const hasLabel = badges.length > 0 || data.isRolling || data.preserveMass;
   const travel = useTravelForConnection(props.id);
 
+  const endpointState = (end: ConnectionEnd): ConnectionEndpointState =>
+    hoveredEnd === end ? 'armed' : hovered ? 'revealed' : 'idle';
+
+  const onEndpointHover = (end: ConnectionEnd, isHovered: boolean) =>
+    setHoveredEnd((current) => (isHovered ? end : current === end ? null : current));
+
   return (
     <>
-      <BaseEdge path={path} style={finalStyle} />
+      <g
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => {
+          setHovered(false);
+          setHoveredEnd(null);
+        }}
+      >
+        {data.sourceBubbled && (
+          <ConnectionBubble
+            gradientId={`bubble-${props.id}-source`}
+            path={path}
+            strokeWidth={finalStyle.strokeWidth ?? 3}
+            anchor={sourceAnchor}
+            far={targetAnchor}
+          />
+        )}
+        {data.targetBubbled && (
+          <ConnectionBubble
+            gradientId={`bubble-${props.id}-target`}
+            path={path}
+            strokeWidth={finalStyle.strokeWidth ?? 3}
+            anchor={targetAnchor}
+            far={sourceAnchor}
+          />
+        )}
+        <BaseEdge path={path} style={finalStyle} />
+        <ConnectionEndpoint
+          end="source"
+          anchor={sourceAnchor}
+          state={endpointState('source')}
+          bubbled={data.sourceBubbled}
+          onHoverChange={onEndpointHover}
+          onContextMenu={(end, clientX, clientY) => data.onEndpointContextMenu(props.id, end, clientX, clientY)}
+        />
+        <ConnectionEndpoint
+          end="target"
+          anchor={targetAnchor}
+          state={endpointState('target')}
+          bubbled={data.targetBubbled}
+          onHoverChange={onEndpointHover}
+          onContextMenu={(end, clientX, clientY) => data.onEndpointContextMenu(props.id, end, clientX, clientY)}
+        />
+      </g>
       {travel && (
         <TravelDot
           key={travel.token}

@@ -255,6 +255,7 @@ export type ShareRedactionProfile = {
   presenceMode: SharePresenceMode;
   showSignatures: boolean;
   showConnectionSigIds: boolean;
+  showBubbles: boolean;
 };
 
 /**
@@ -695,8 +696,12 @@ export type StoredMapLayout = Omit<MapLayoutConfig, 'groups'> & {
 export type MapContextMenuTarget =
   | { kind: 'system'; id: string; x: number; y: number }
   | { kind: 'connection'; id: string; x: number; y: number }
+  | { kind: 'connectionEnd'; id: string; end: ConnectionEnd; x: number; y: number }
   | { kind: 'note'; id: string; x: number; y: number }
   | { kind: 'pane'; x: number; y: number };
+
+/** Which mouth of a connection an operation refers to. */
+export type ConnectionEnd = 'source' | 'target';
 
 /** Filter state for the `sigSearch` panel (`SignatureSearchModule`). Owned by `MapCanvas` so it persists across the session. */
 export type SigSearchFilters = {
