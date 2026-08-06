@@ -17,7 +17,7 @@
 | onImported | (payloads: MapEventPayload[]) => void | yes | Folds imported event payloads onto the live canvas (wired to the canvas's `onBulkPaste`). |
 
 ### Renders
-A tabbed dialog (`Tabs`): **General** (name + icon inputs, read-only scope/visibility) and **Settings** (per-device display preferences — low-contrast theme toggle plus wormhole-type-picker grouping toggles) always show. Each management tab is revealed by the viewer's capability: **Behavior** + **Auto-tagging** (`settings_manage`, `MapBehaviorForm` / `MapTaggingForm`), **Webhooks** (`webhooks_manage`, `MapWebhooksPanel`), **Share links** (`share_manage`, `MapSharePanel`), **Export** (`map_export`), **Import** (`map_import`). **Roles & Permissions** (`MapRolesForm`) shows only for a manager (`canManage`).
+A wide, height-capped tabbed dialog (`Tabs`); the tab-panel area scrolls on its own so a tall tab never pushes the dialog past the viewport. **General** (name + icon inputs, read-only scope/visibility) and **Settings** (per-device display preferences — low-contrast theme toggle plus wormhole-type-picker grouping toggles) always show. Each management tab is revealed by the viewer's capability: **Behavior** + **Auto-tagging** (`settings_manage`, `MapBehaviorForm` / `MapTaggingForm`), **Webhooks** (`webhooks_manage`, `MapWebhooksPanel`), **Share links** (`share_manage`, `MapSharePanel`), **Export** (`map_export`), **Import** (`map_import`). **Roles & Permissions** (`MapRolesForm`) shows only for a manager (`canManage`).
 
 ### Behaviour & Interactions
 - General Save → `updateMapSettingsAction({ mapId, name, icon })` (`map_update`); empty icon trims to `null`. A name change reflects live on the canvas via the realtime `map.update` echo.
@@ -26,7 +26,7 @@ A tabbed dialog (`Tabs`): **General** (name + icon inputs, read-only scope/visib
 - Export → `exportMapOnServer({ mapId })`; on success builds a `Blob` and triggers a download named `aperture-map-<id>-<YYYY-MM-DD>.json`.
 - Import → reads the chosen file, `JSON.parse`s it, posts via `importMapOnServer`; on success calls `onImported(payloads)` and toasts a summary, then resets the file input. Invalid JSON / schema-invalid files toast an error (the client wrapper handles HTTP errors).
 - Scope/type are shown read-only (immutable post-create).
-- **Management tabs** are revealed per delegated capability (`capabilities`) — a manager holds all; a delegated title-holder sees only the tabs for the features granted to their title. Every tab is re-checked server-side by its capability regardless of what the UI shows. **Roles & Permissions** (delegating features to titles) is manager-only and corp-map-only; on private/alliance maps `MapRolesForm` renders an unavailable note. The audit log lives in its own wider dialog (`MapAuditDialog`), not here.
+- **Management tabs** are revealed per delegated capability (`capabilities`) — a manager holds all; a delegated title-holder sees only the tabs for the features granted to their title. Every tab is re-checked server-side by its capability regardless of what the UI shows. **Roles & Permissions** (delegating features to titles) is manager-only and corp-map-only; on private/alliance maps `MapRolesForm` renders an unavailable note. The audit log lives in its own dialog (`MapAuditDialog`), not here.
 
 ### Emits / Calls
 - `updateMapSettingsAction`, `exportMapOnServer`, `importMapOnServer`.

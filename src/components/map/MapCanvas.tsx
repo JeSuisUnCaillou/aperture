@@ -21,6 +21,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import type { Layout, ResponsiveLayouts } from 'react-grid-layout';
 import type {
   Breakpoint,
+  ConnectionEnd,
   LiveShareBadge,
   MapCapability,
   MapContextMenuTarget,
@@ -1304,6 +1305,13 @@ export function MapCanvas({
     setContextMenu({ kind: 'connection', id: edge.id, x: event.clientX, y: event.clientY });
   }, []);
 
+  const onEndpointContextMenu = useCallback(
+    (connectionId: string, end: ConnectionEnd, clientX: number, clientY: number) => {
+      setContextMenu({ kind: 'connectionEnd', id: connectionId, end, x: clientX, y: clientY });
+    },
+    [],
+  );
+
   const onPaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
     event.preventDefault();
     setContextMenu({ kind: 'pane', x: event.clientX, y: event.clientY });
@@ -1806,11 +1814,12 @@ export function MapCanvas({
           mapId: viewData.map.id,
           wormholeTypeId: wh?.typeId ?? null,
           wormholeCode: wh?.code ?? null,
+          onEndpointContextMenu,
         },
         selected: selected?.kind === 'connection' && selected.id === c.id,
       };
     });
-  }, [viewData.connections, viewData.signatures, viewData.map.id, selected]);
+  }, [viewData.connections, viewData.signatures, viewData.map.id, selected, onEndpointContextMenu]);
 
   const selectedSystem: MapSystemNode | null = useMemo(() => {
     if (selected?.kind !== 'system') return null;

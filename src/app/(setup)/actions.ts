@@ -25,7 +25,7 @@ import {
   setAccessMode,
 } from '@/lib/auth/instanceConfig';
 import { env } from '@/lib/env';
-import { onDemandJobModules } from '@/lib/jobs/registry';
+import { jobQueueFor, onDemandJobModules } from '@/lib/jobs/registry';
 import { logger } from '@/lib/log/logger';
 
 /**
@@ -182,14 +182,18 @@ interface EnqueueResult {
 }
 
 async function enqueueJob(taskName: string): Promise<EnqueueResult> {
+  const queueName = jobQueueFor(taskName);
   const result = await db.execute<{ id: string | number }>(
-    sql`SELECT graphile_worker.add_job(${taskName}, '{}'::json) AS id`,
+    sql`SELECT graphile_worker.add_job(${taskName}, '{}'::json, ${queueName}::text) AS id`,
   );
   const id = result.rows[0]?.id;
   return { jobId: id === undefined || id === null ? '' : String(id) };
 }
 
-/** Enqueue the `sde-ingest` graphile-worker job. Returns the queued job id. */
+/**
+ * Enqueue the `sde-ingest` graphile-worker job — a re-run of the pipeline
+ * against the build the database already holds. Returns the queued job id.
+ */
 export async function setupRunSdeIngest(): Promise<ActionResult<EnqueueResult>> {
   const gated = await gate();
   if (!gated.ok) return gated;
@@ -197,6 +201,23 @@ export async function setupRunSdeIngest(): Promise<ActionResult<EnqueueResult>> 
 
   try {
     return { ok: true, data: await enqueueJob('sde-ingest') };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Enqueue failed.' };
+  }
+}
+
+/**
+ * Enqueue the `sde-refresh` graphile-worker job — the daily self-refresh path,
+ * run now. Checks CCP's latest manifest and ingests it when it is newer than
+ * the build the database holds; a no-op when already current.
+ */
+export async function setupRunSdeRefresh(): Promise<ActionResult<EnqueueResult>> {
+  const gated = await gate();
+  if (!gated.ok) return gated;
+  await logAction('run-sde-refresh');
+
+  try {
+    return { ok: true, data: await enqueueJob('sde-refresh') };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Enqueue failed.' };
   }

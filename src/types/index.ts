@@ -25,6 +25,7 @@ import type {
   apMetricSnapshot,
   apRole,
   apRouteDestination,
+  apSdeState,
   apStructure,
   apStructureEvent,
   apSystemStats,
@@ -221,6 +222,9 @@ export type NewApStructure = InferInsertModel<typeof apStructure>;
 export type ApStructureEvent = InferSelectModel<typeof apStructureEvent>;
 export type NewApStructureEvent = InferInsertModel<typeof apStructureEvent>;
 
+export type ApSdeState = InferSelectModel<typeof apSdeState>;
+export type NewApSdeState = InferInsertModel<typeof apSdeState>;
+
 // Enum unions. `pgEnum` exposes its values via `.enumValues`; the
 // `[number]` index extracts the union of string literals.
 export type AuthzLevel = (typeof authzLevel.enumValues)[number];
@@ -251,6 +255,7 @@ export type ShareRedactionProfile = {
   presenceMode: SharePresenceMode;
   showSignatures: boolean;
   showConnectionSigIds: boolean;
+  showBubbles: boolean;
 };
 
 /**
@@ -691,8 +696,12 @@ export type StoredMapLayout = Omit<MapLayoutConfig, 'groups'> & {
 export type MapContextMenuTarget =
   | { kind: 'system'; id: string; x: number; y: number }
   | { kind: 'connection'; id: string; x: number; y: number }
+  | { kind: 'connectionEnd'; id: string; end: ConnectionEnd; x: number; y: number }
   | { kind: 'note'; id: string; x: number; y: number }
   | { kind: 'pane'; x: number; y: number };
+
+/** Which mouth of a connection an operation refers to. */
+export type ConnectionEnd = 'source' | 'target';
 
 /** Filter state for the `sigSearch` panel (`SignatureSearchModule`). Owned by `MapCanvas` so it persists across the session. */
 export type SigSearchFilters = {

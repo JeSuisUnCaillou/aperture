@@ -217,6 +217,8 @@ const connectionEdgeBody = {
   preserveMass: z.boolean(),
   isRolling: z.boolean(),
   isStatic: z.boolean(),
+  sourceBubbled: z.boolean(),
+  targetBubbled: z.boolean(),
   eolAt: z.string().nullable(),
   createdAt: z.string(),
 };
@@ -308,6 +310,8 @@ export const mapEventPayloadSchema = z.discriminatedUnion('kind', [
     preserveMass: z.boolean().optional(),
     isRolling: z.boolean().optional(),
     isStatic: z.boolean().optional(),
+    sourceBubbled: z.boolean().optional(),
+    targetBubbled: z.boolean().optional(),
     eolAt: z.string().nullable().optional(),
     // Audit descriptors (endpoint `ap_map_system` ids). Carried so the event
     // self-describes its endpoints even after the connection is hard-deleted —
@@ -456,6 +460,10 @@ export const mapEventPayloadSchema = z.discriminatedUnion('kind', [
     presenceMode: z.enum(sharePresenceMode.enumValues),
     showSignatures: z.boolean(),
     showConnectionSigIds: z.boolean(),
+    // Optional so a payload written before bubbles were publishable still
+    // parses — an audit line must not degrade to the generic fallback because
+    // the profile grew a flag.
+    showBubbles: z.boolean().optional().default(false),
     expiresAt: z.string().nullable(),
   }),
   z.object({
