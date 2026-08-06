@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.0.0-rc.18
+
+Wormhole ends can now be marked as bubbled so a camped hole reads at a glance, and static data keeps itself current instead of quietly drifting behind FC's builds.
+
+### New features
+
+- **Bubbled connection ends** - either mouth of a connection can be flagged as bubbled, drawn as a ring straddling the line at the mouth with a wash fading away along it. The two ends are independent, so a hole bubbled on one side only says exactly that. Right-clicking an endpoint opens its own menu with the toggle; the endpoint marks stay the same size on screen at any zoom, and their hit targets are sized off the fan so adjacent holes on one face never fight over the pointer. Bubble changes are named in the audit trail and webhook lines, including which end they happened at. *(MonoliYoda)*
+- **Static data keeps itself current** - a daily job checks FC's published SDE build and ingests a newer one on its own. The ingest runs in an isolated child process behind acceptance gates that reject a bad build whole rather than half-writing it, so a broken publish can't leave the universe tables in pieces. *(MonoliYoda)*
+- **A banner when static data is stale or failing** - an SDE that has fallen behind or whose refresh keeps failing now raises a banner naming the consequence (recently added systems or gates may be missing), instead of sitting silent in the logs. `/setup` shows which build the database actually holds, how the last check went, and offers cards to re-ingest or refresh on demand. *(MonoliYoda)*
+
+### Improvements
+
+- **Bubbles on public share links** - a share link can opt in to publishing the bubbled flags, so spectators see the same camps the map does. It is off by default, per link, alongside the existing signature toggles. *(MonoliYoda)*
+
+### Fixes
+
+- **Phantom wormholes between Kassigainen and Pakhshi** - the pinned SDE predated Cradle of War and was missing the gate that expansion added, so the two systems looked like they were joined by a hole. The refreshed build carries the gate. *(MonoliYoda)*
+- **Test wormhole types no longer report as uncatalogued** - two unpublished QA types in the wormhole group produced codes "A" and "B" on every ingest, permanent noise on `/setup` that drowned out the one thing that list is for: a genuinely new hole type. They are skipped now. *(MonoliYoda)*
+- **The map settings dialog fits its nine tabs** - the tab strip no longer scrolls sideways, and tall tabs (Roles & Permissions, Webhooks, Share links) scroll inside the panel rather than stretching the dialog past the viewport. *(MonoliYoda)*
+
+### Misc
+
+- **EVE SSO setup is documented** - the README covers registering the application and the scopes Aperture needs. *(MonoliYoda)*
+
+### Upgrading
+
+- Run the SDE ingest once after deploying, from the `/setup` console. The README's deployment section explains which card to use.
+
+### Contributors
+
+- **MonoliYoda** - bubbled connection ends, SDE self-refresh and staleness reporting, the Kassigainen-Pakhshi and settings-dialog fixes
+
 ## v1.0.0-rc.17
 
 You can now share a live, read-only view of your chain with anyone via a link, systems with several holes on one side draw them properly fanned out, and tabs left open across a deploy tell you to reload.
