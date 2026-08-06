@@ -38,9 +38,6 @@ importers:
       '@xyflow/react':
         specifier: ^12.10.2
         version: 12.10.2(@types/react@19.2.15)(immer@11.1.8)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      adm-zip:
-        specifier: ^0.5.17
-        version: 0.5.17
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -144,6 +141,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.2
         version: 6.0.2(vite@8.0.14(@types/node@24.12.4)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+      adm-zip:
+        specifier: ^0.5.17
+        version: 0.5.17
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
