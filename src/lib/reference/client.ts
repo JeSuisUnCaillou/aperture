@@ -2,13 +2,13 @@
 
 import { requestJson, type FetchResult } from '@/lib/http/fetchJson';
 import type { WormholeJumpInfoRow } from '@/lib/eve/wormholeJumpInfo';
-import type { ShipTypeGroupRow } from '@/lib/eve/shipTypes';
+import type { ScanTypeRow } from '@/lib/eve/shipTypes';
 
 /**
  * Browser-side fetches for the app's static SDE reference catalogs. Each is
- * immutable for a session, so the first successful response is memoised and
- * reused — the Jump Info dialog can reopen, and the overlay can take a second
- * D-Scan paste, without re-hitting the network.
+ * immutable for a session, so what has been resolved once is reused — the Jump
+ * Info dialog can reopen, and the overlay can take a second D-Scan paste,
+ * without re-hitting the network.
  */
 
 let jumpInfoCache: WormholeJumpInfoRow[] | null = null;
@@ -23,31 +23,48 @@ export async function fetchWormholeJumpInfo(): Promise<FetchResult<WormholeJumpI
   return result;
 }
 
-let shipTypeCache: ReadonlyMap<number, number> | null = null;
-let shipTypeInFlight: Promise<ReadonlyMap<number, number> | null> | null = null;
+/** The SDE's verdict on a scanned type id. */
+export type ScanTypeInfo = { groupId: number; isShip: boolean };
+
+// typeId → its classification, or null once the server has confirmed the SDE
+// does not carry that id. A failed request caches nothing, so it is retried.
+const scanTypeCache = new Map<number, ScanTypeInfo | null>();
 
 /**
- * Ship type id → SDE group id, for telling ships from the rest of a D-Scan.
- * Resolves to null when the request fails, which `requestJson` has already
- * surfaced as a toast — callers degrade rather than treat everything as a hull.
+ * Classify the type ids one D-Scan reported.
+ *
+ * Resolves to a map holding only the ids the SDE carries: an id the caller
+ * asked about but does not find in the map is unknown to this build, which is
+ * a different answer from a known non-ship.
+ *
+ * Resolves to **null** when the lookup fails, which `requestJson` has already
+ * surfaced as a toast — callers must degrade visibly rather than read a failure
+ * as a scan holding no ships.
  */
-export async function fetchShipTypeGroups(): Promise<ReadonlyMap<number, number> | null> {
-  if (shipTypeCache) return shipTypeCache;
-  // The cache is only populated once the response lands, so callers arriving
-  // during the first request share that one rather than each firing their own.
-  // Cleared on settle, so a failed fetch is retried by the next caller.
-  shipTypeInFlight ??= loadShipTypeGroups().finally(() => {
-    shipTypeInFlight = null;
-  });
-  return shipTypeInFlight;
-}
+export async function fetchScanTypes(
+  typeIds: readonly number[],
+): Promise<ReadonlyMap<number, ScanTypeInfo> | null> {
+  const missing = [...new Set(typeIds)].filter((id) => !scanTypeCache.has(id));
+  if (missing.length > 0) {
+    const result = await requestJson<FetchResult<ScanTypeRow[]>>(
+      'POST',
+      '/api/reference/scan-types',
+      { typeIds: missing },
+    );
+    if (!result.ok) return null;
+    // Absent from the reply is the answer "the SDE has no such type", so every
+    // id asked about is recorded — otherwise each scan re-asks about the same
+    // unknowns.
+    for (const id of missing) scanTypeCache.set(id, null);
+    for (const row of result.data) {
+      scanTypeCache.set(row.typeId, { groupId: row.groupId, isShip: row.isShip });
+    }
+  }
 
-async function loadShipTypeGroups(): Promise<ReadonlyMap<number, number> | null> {
-  const result = await requestJson<FetchResult<ShipTypeGroupRow[]>>(
-    'GET',
-    '/api/reference/ship-types',
-  );
-  if (!result.ok) return null;
-  shipTypeCache = new Map(result.data.map((r) => [r.typeId, r.groupId]));
-  return shipTypeCache;
+  const known = new Map<number, ScanTypeInfo>();
+  for (const id of typeIds) {
+    const info = scanTypeCache.get(id);
+    if (info) known.set(id, info);
+  }
+  return known;
 }

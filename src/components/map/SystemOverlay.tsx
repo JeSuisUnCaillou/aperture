@@ -10,7 +10,7 @@ import { connectionExpiredSinceMs, connectionTimeLeftMs } from '@/lib/map/connec
 import { formatAgoFromMs, formatRelativeFromMs } from '@/lib/map/relativeTime';
 import { parseDscanPaste } from '@/lib/map/dscanParser';
 import { resolveShipClass } from '@/lib/eve/shipClass';
-import { fetchShipTypeGroups } from '@/lib/reference/client';
+import { fetchScanTypes } from '@/lib/reference/client';
 import { pingSystemOnServer, updateSystemOnServer } from '@/lib/map/client';
 import { RALLY_UNDERGLOW, UNDERGLOW_PRESETS } from '@/components/map/underglowPresets';
 import { cn } from '@/lib/utils';
@@ -28,7 +28,7 @@ import { Button } from '../ui/button';
 // Re-tick the EOL countdown on the same cadence as the canvas edge label.
 const EOL_TICK_MS = 30_000;
 
-// How long the "No ships in D-SCAN" notice stays on screen.
+// How long a D-SCAN notice stays on screen.
 const NOTICE_TTL_MS = 30_000;
 
 /** System class label: the `C<n>`/sec rating, falling back to trueSec then `?`. */
@@ -419,29 +419,38 @@ function PilotSection({
     const rows = parseDscanPaste(e.clipboardData.getData('text'));
     if (rows.length === 0) return; // not D-Scan — let it land as a typed query
     e.preventDefault();
+    // The paste is claimed, so the box holds nothing the user meant to keep.
+    // Cleared before the await, which anything typed during would otherwise
+    // lose when the scan settles.
+    setQuery('');
     const scan = ++scanCount.current;
 
-    // Which type ids are hulls comes from the SDE, memoised for the session:
-    // only the first paste after a reload costs a request. Null when it failed,
-    // which `requestJson` has already surfaced as a toast.
-    const shipTypes = await fetchShipTypeGroups();
+    // Which type ids are hulls comes from the SDE, cached per id for the
+    // session. Null when the lookup failed, which `requestJson` has already
+    // surfaced as a toast.
+    const types = await fetchScanTypes(rows.map((row) => row.typeId));
     // Several pastes can be in the air at once, and they need not settle in
     // order. Only the newest scan may touch the panel; an overtaken one drops
     // its result instead of replacing a fresher set with a staler one.
     if (scan !== scanCount.current) return;
+    if (types === null) {
+      // The toast landed in the opener document, which sits behind the game
+      // client while the overlay is a PiP window, so the failure has to show
+      // in the panel. Silence here would read as a scan holding no ships, and
+      // the pinned set is left alone rather than cleared on no information.
+      setNotice({ text: 'Ship list unavailable, D-SCAN not read' });
+      return;
+    }
     const roster = rosterRef.current;
     // A scan lists everything in range, most of it not a ship at all; only what
     // the SDE files under the Ship category belongs against a ship list.
     // Gating on the parsed rows rather than the ship rows keeps a scan holding
     // no ships from being mistaken for a typed query.
     //
-    // Anything a tracked pilot is flying is a ship by demonstration, so the
-    // panel still recognises its own fleet even with no catalog to consult.
-    const ships = rows.filter(
-      (row) =>
-        (shipTypes?.has(row.typeId) ?? false) || roster.some((p) => p.shipTypeId === row.typeId),
-    );
-    setQuery('');
+    // A type id the SDE has never heard of is kept: a hull released after this
+    // build's SDE arrives that way, and an intel panel that hides a hostile
+    // is worse than one that lists a novel structure.
+    const ships = rows.filter((row) => types.get(row.typeId)?.isShip ?? true);
     if (ships.length === 0) {
       setNotice({ text: 'No ships in D-SCAN' });
       return;
@@ -456,7 +465,7 @@ function PilotSection({
           key: `d:${scan}:${row.typeId}:${i}`,
           name: row.name,
           typeName: row.typeName,
-          shipClass: resolveShipClass(row.typeId, shipTypes?.get(row.typeId) ?? null),
+          shipClass: resolveShipClass(row.typeId, types.get(row.typeId)?.groupId ?? null),
         })),
     );
   }
