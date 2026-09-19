@@ -39,9 +39,11 @@ const TYPE_ID_RE = /^\d+$/;
  * non-blank — a language-independent gate that rejects ordinary typed text, so
  * a caller can use an empty result to mean "this paste was not a D-Scan".
  *
- * Tolerates clipboards that strip tabs by also splitting on 2+ spaces; the
- * columns are space-padded in that form, so only a name containing a run of
- * two or more spaces is mis-split.
+ * Tolerates clipboards that strip tabs by also splitting on 2+ spaces. A name
+ * holding its own run of two or more spaces over-splits in that form; the cells
+ * between the id and the Type are rejoined, which restores a run of exactly two
+ * spaces and narrows a wider one, since the column gaps are padded with spaces
+ * too.
  */
 export function parseDscanPaste(text: string): ParsedDscanRow[] {
   const out: ParsedDscanRow[] = [];
@@ -54,15 +56,19 @@ export function parseDscanPaste(text: string): ParsedDscanRow[] {
     const cells = line.includes('\t') ? line.split('\t') : line.split(/ {2,}/);
     // A scan line always carries all four columns. Accepting three would let
     // ordinary tabular text with a numeric first cell pass as a D-Scan, and the
-    // caller swallows a paste it recognizes — costing the user their query. More
-    // than four is still fine: a name holding a run of spaces over-splits.
+    // caller swallows a paste it recognizes — costing the user their query.
     if (cells.length < 4) continue;
 
     const rawTypeId = (cells[0] ?? '').trim();
     if (!TYPE_ID_RE.test(rawTypeId)) continue;
 
-    const name = (cells[1] ?? '').trim();
-    const typeName = (cells[2] ?? '').trim();
+    // The columns are pinned at both ends: Distance is last, Type the one
+    // before it. On the fallback path a run of two or more spaces inside the
+    // Name over-splits it, so the Name is every cell between the id and the
+    // Type rather than a single one. A hull name never holds such a run, so
+    // the tail stays a reliable anchor.
+    const name = cells.slice(1, -2).join('  ').trim();
+    const typeName = (cells.at(-2) ?? '').trim();
     if (name.length === 0 || typeName.length === 0) continue;
 
     out.push({ typeId: Number(rawTypeId), name, typeName });

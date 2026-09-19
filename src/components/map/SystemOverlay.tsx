@@ -175,10 +175,15 @@ function Header({
  * cell that produced it. Case-insensitive, to match how the search compares.
  * Renders the text untouched when there is no needle.
  */
-function Highlight({ text, needle }: { text: string; needle?: string }) {
+export function Highlight({ text, needle }: { text: string; needle?: string }) {
   if (!needle) return <>{text}</>;
   const haystack = text.toLowerCase();
   const target = needle.toLowerCase();
+  // Hits are found in the lowercased copy and sliced out of the original, which
+  // holds only while the two line up. Lowercasing is not length-preserving for
+  // every character (U+0130 yields two), and one such character would shift
+  // every boundary after it.
+  if (haystack.length !== text.length) return <>{text}</>;
   const parts: ReactNode[] = [];
   let at = 0;
   for (let hit = haystack.indexOf(target); hit !== -1; hit = haystack.indexOf(target, at)) {
@@ -338,7 +343,7 @@ function EnemyCells({ ship, highlight }: { ship: EnemyShip; highlight?: string }
  * or the pilot's name appearing inside it (the client's default `<Pilot>'s
  * <Type>` naming) — same ship, same pilot.
  */
-function matchDscanRow(
+export function matchDscanRow(
   row: ParsedDscanRow,
   roster: readonly MapPresenceEntry[],
 ): MapPresenceEntry | null {

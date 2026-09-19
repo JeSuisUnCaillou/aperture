@@ -3,6 +3,10 @@
 **Purpose:** Floating overlay panel showing the active character's current system, a search/D-Scan box over the other pilots in it and their ships, the non-abyssal connections out with mass/EOL state, and Ping/Rally action buttons for the current node.
 **File:** `src/components/map/SystemOverlay.tsx`
 
+### Also exports
+- `matchDscanRow(row: ParsedDscanRow, roster: readonly MapPresenceEntry[]): MapPresenceEntry | null` — the roster entry a D-Scan line names, or null when nobody in the list flies it. Callers read only its null-ness.
+- `Highlight({ text, needle })` — `text` with every case-insensitive occurrence of `needle` `<mark>`ed.
+
 ### Props
 
 | Prop | Type | Required | Description |
