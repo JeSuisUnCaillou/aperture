@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchDscanRow } from '@/components/map/SystemOverlay';
+import { matchDscanRow, resolveDscan } from '@/components/map/SystemOverlay';
 import { parseDscanPaste } from '@/lib/map/dscanParser';
 import type { MapPresenceEntry, ParsedDscanRow } from '@/types';
 
@@ -124,5 +124,45 @@ describe('matchDscanRow', () => {
       shipName: 'Nancy',
     });
     expect(matchDscanRow(row({ name: 'Nancy' }), [elsewhere, onHull])).toBe(onHull);
+  });
+});
+
+describe('resolveDscan', () => {
+  const all = (...pilots: MapPresenceEntry[]) => new Set(pilots.map((p) => p.characterId));
+
+  it('records each shown pilot with the hull the scan listed them in', () => {
+    const bob = pilot({ characterId: 7, characterName: 'Bob' });
+    const out = resolveDscan([row({ name: "Bob's Prospect" })], [bob], all(bob));
+    expect(out.unmatched).toEqual([]);
+    expect([...out.scannedHullByChar]).toEqual([[7, 33697]]);
+  });
+
+  it('gives two friendlies sharing a hull name one row each', () => {
+    const bob = pilot({ characterId: 7, characterName: 'Bob', shipName: 'Nancy' });
+    const amy = pilot({ characterId: 8, characterName: 'Amy', shipName: 'Nancy' });
+    const out = resolveDscan(
+      [row({ name: 'Nancy' }), row({ name: 'Nancy' })],
+      [bob, amy],
+      all(bob, amy),
+    );
+    expect(out.unmatched).toEqual([]);
+    expect([...out.scannedHullByChar.keys()].sort()).toEqual([7, 8]);
+  });
+
+  it('leaves a second row on the same pilot unmatched', () => {
+    // A hostile under a copied name, or a spare hull on grid: one pilot, two ships.
+    const bob = pilot({ characterId: 7, characterName: 'Bob' });
+    const twice = [row({ name: "Bob's Prospect" }), row({ name: "Bob's Prospect" })];
+    const out = resolveDscan(twice, [bob], all(bob));
+    expect(out.unmatched).toEqual([twice[1]]);
+    expect([...out.scannedHullByChar]).toEqual([[7, 33697]]);
+  });
+
+  it('resolves a pilot the table does not show without recording them', () => {
+    // The active character: their own hull must not pin, but they have no row.
+    const me = pilot({ characterId: 1, characterName: 'Me' });
+    const out = resolveDscan([row({ name: "Me's Prospect" })], [me], new Set());
+    expect(out.unmatched).toEqual([]);
+    expect(out.scannedHullByChar.size).toBe(0);
   });
 });
