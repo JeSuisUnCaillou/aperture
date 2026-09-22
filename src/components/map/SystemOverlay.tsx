@@ -8,7 +8,7 @@ import { ShipClassIcon } from '@/components/icons/ShipClassIcon';
 import { ChevronDown, ChevronUp, Flag } from 'lucide-react';
 import { connectionExpiredSinceMs, connectionTimeLeftMs } from '@/lib/map/connectionState';
 import { formatAgoFromMs, formatRelativeFromMs } from '@/lib/map/relativeTime';
-import { parseDscanPaste } from '@/lib/map/dscanParser';
+import { parseDscanPaste, shipNameKey } from '@/lib/map/dscanParser';
 import { resolveShipClass } from '@/lib/eve/shipClass';
 import { fetchScanTypes } from '@/lib/reference/client';
 import { pingSystemOnServer, updateSystemOnServer } from '@/lib/map/client';
@@ -347,12 +347,12 @@ export function matchDscanRow(
   row: ParsedDscanRow,
   roster: readonly MapPresenceEntry[],
 ): MapPresenceEntry | null {
-  const name = row.name.toLowerCase();
+  const name = shipNameKey(row.name);
   const onHull = roster.filter((p) => p.shipTypeId === row.typeId);
 
   // ESI stores the ship's own name, which is the same string D-Scan prints, so
   // an exact match is the dependable path.
-  const named = onHull.find((p) => (p.shipName ?? '').toLowerCase() === name);
+  const named = onHull.find((p) => shipNameKey(p.shipName ?? '') === name);
   if (named) return named;
 
   // Otherwise fall back to the client's default `<Pilot>'s <Type>` naming,

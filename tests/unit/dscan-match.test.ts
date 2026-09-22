@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { matchDscanRow } from '@/components/map/SystemOverlay';
+import { parseDscanPaste } from '@/lib/map/dscanParser';
 import type { MapPresenceEntry, ParsedDscanRow } from '@/types';
 
 function pilot(over: Partial<MapPresenceEntry> & { characterName: string }): MapPresenceEntry {
@@ -37,6 +38,32 @@ describe('matchDscanRow', () => {
   it('compares ship names case-insensitively', () => {
     const bob = pilot({ characterId: 7, characterName: 'Bob', shipName: 'NaNcY' });
     expect(matchDscanRow(row({ name: 'nancy' }), [bob])).toBe(bob);
+  });
+
+  it('ignores the whitespace ESI keeps in a ship name and the paste drops', () => {
+    // A hull named with a trailing space: ESI stores it, a tab-less paste loses it.
+    const trailing = pilot({ characterId: 7, characterName: 'Bob', shipName: 'Nancy ' });
+    expect(matchDscanRow(row({ name: 'Nancy' }), [trailing])).toBe(trailing);
+    // A run of three spaces narrows to two on the tab-less paste path.
+    const run = pilot({ characterId: 8, characterName: 'Amy', shipName: 'My   Ship' });
+    expect(matchDscanRow(row({ name: 'My  Ship' }), [run])).toBe(run);
+  });
+
+  it('resolves the padded field row whose name ends in a space', () => {
+    // Verbatim from a production clipboard: the name cell is `░ BOOOP BEEEP ░ `,
+    // so five spaces sit before the Type where every other row has four.
+    const line = '641    ░ BOOOP BEEEP ░     Megathron    -';
+    const [scanned] = parseDscanPaste(line);
+    const smitth = pilot({
+      characterId: 7,
+      characterName: 'Agent Smitth',
+      shipTypeId: 641,
+      shipTypeName: 'Megathron',
+      shipName: '░ BOOOP BEEEP ░ ',
+    });
+    expect(scanned).toEqual({ typeId: 641, name: '░ BOOOP BEEEP ░', typeName: 'Megathron' });
+    expect(matchDscanRow(scanned!, [smitth])).toBe(smitth);
+    expect(matchDscanRow(scanned!, [{ ...smitth, shipTypeId: 11202 }])).toBeNull();
   });
 
   it("falls back to the client's <Pilot>'s <Type> default", () => {
